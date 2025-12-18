@@ -1,0 +1,6 @@
+[submodule "textual"]
+	path = textual
+	url = git@github.com:Textualize/textual.git
+[submodule "textual-rs"]
+	path = textual-rs
+	url = git@github.com:fcoury/textual-rs.git
