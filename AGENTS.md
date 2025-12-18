@@ -25,6 +25,13 @@
 - Implement or adjust code to make the tests pass.
 - Keep tests in the standard `textual-rs/tests` folder.
 
+## Commit workflow (submodule + outer repo)
+
+- Commit Rust changes in the `textual-rs` submodule first, then push that submodule.
+- If a phase is completed, update the outer repo to point at the new `textual-rs` commit:
+  - From the root repo, stage the submodule pointer update and commit it.
+- Use Angular-style commit messages (e.g., `feat: ...`, `chore: ...`) and include a short detail summary in the body.
+
 ## Code hygiene
 
 - After each feature implementation, run `cargo fmt --all` and `cargo clippy`.
