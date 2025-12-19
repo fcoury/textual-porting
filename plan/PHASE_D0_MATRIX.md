@@ -112,3 +112,8 @@ Status legend: Supported | Partial | Missing
 - Variables: `$var:` declarations + `$var` references (in mega stylesheet + tokenizer tests).
 - Values/functions: `rgb(...)`, `hsl(...)`, hex + named colors, `!important`.
 - Units/lengths: plain numbers, `%`, `fr`, `vw`, `vh`, `w`, `h`, durations `ms`/`s`, plus keyword `auto`.
+
+## Recent Rust coverage updates
+
+- Color parsing: `hsl(...)`/`hsla(...)` support plus `transparent`, `coral`, `aqua`, `deepskyblue`, `rebeccapurple`.
+- Pseudo-class matching: added `:enabled` (still missing `:inline` handling).
