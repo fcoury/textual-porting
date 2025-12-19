@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Project-specific instructions for agents working in this repo.
+
 ## Git and submodules
 
 - This is the migration project for Textual's Python codebase to Rust.
@@ -12,7 +14,7 @@
 ## TUI testing via tmux
 
 - Start a session: `tmux new -d -s codex-shell -n shell`
-- Run commands safely: `tmux send-keys -t codex-shell:0.0 -- 'cargo run --bin demo' Enter`
+- Run commands safely: `tmux send-keys -t codex-shell:0.0 -- 'cargo run --example demo' Enter`
 - Attach to watch: `tmux attach -t codex-shell`
 - Capture output (last 200 lines): `tmux capture-pane -p -J -t codex-shell:0.0 -S -200`
 - If a run exceeds ~10 minutes, treat it as potentially hung and inspect via tmux.
@@ -35,4 +37,10 @@
 ## Code hygiene
 
 - After each feature implementation, run `cargo fmt --all` and `cargo clippy`.
-- Keep `textual-rs/src/bin/demo.rs` updated to exercise newly implemented features for visual/manual validation.
+- Keep `textual-rs/examples/demo.rs` updated to exercise newly implemented features for visual/manual validation.
+
+## Examples workflow
+
+- Demos live in `textual-rs/examples` and should be runnable via `cargo run --example <name>`.
+- Prefer smaller focused examples for new features instead of growing a single monolithic demo.
+- At the end of each major new feature, check if we should update the main demo to showcase it.
