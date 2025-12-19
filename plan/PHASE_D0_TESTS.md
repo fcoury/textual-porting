@@ -2,14 +2,16 @@
 
 ## CSS Tests (Python)
 Ported/covered (partial coverage):
-- `textual/tests/css/test_tokenize.py` → `textual-rs/tests/css_tokenizer_tests.rs` (basic tokens only; no variables/scalars/advanced TCSS yet)
+- `textual/tests/css/test_tokenize.py` → `textual-rs/tests/css_tokenizer_tests.rs` (basic tokens + variables/scalars/comments; missing pseudo-class validation)
 - `textual/tests/css/test_parse.py` → `textual-rs/tests/css_stylesheet_parse_tests.rs`, `textual-rs/tests/css_selector_parser_tests.rs`
 - `textual/tests/css/test_stylesheet.py` → `textual-rs/tests/css_stylesheet_apply_tests.rs` (specificity/important/cascade basics)
 - `textual/tests/css/test_styles.py` → `textual-rs/tests/effective_style_tests.rs` (tint/opacity blend)
 - `textual/tests/css/test_scalar.py` → `textual-rs/tests/css_spacing_parse_tests.rs` (length + edge parsing subset)
+- `textual/tests/css/test_nested_css.py` → `textual-rs/tests/css_stylesheet_parse_tests.rs` (parse-only nested selector expansion)
+- `textual/tests/css/test_mega_stylesheet.py` → `textual-rs/tests/css_mega_stylesheet_parse_tests.rs` (parse fixture + sentinel selector)
 
 Not yet ported (requires missing features):
-- `test_inheritance.py`, `test_initial.py`, `test_nested_css.py`, `test_screen_css.py`, `test_styles.py` (full), `test_stylesheet.py` (full), `test_programmatic_style_changes.py`
+- `test_inheritance.py`, `test_initial.py`, `test_screen_css.py`, `test_styles.py` (full), `test_stylesheet.py` (full), `test_programmatic_style_changes.py`
 - `test_grid_rows_columns_relative_units.py` (grid), `test_mega_stylesheet.py` (full TCSS), `test_css_reloading.py`, `test_help_text.py`
 
 ## Layout/Arrange Tests (Python)

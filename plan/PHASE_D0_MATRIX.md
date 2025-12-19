@@ -97,3 +97,9 @@ Status legend: Supported | Partial | Missing
 
 - `z-index` (layering order)
 - `background-opacity` (separate from `opacity`/`text-opacity`)
+
+## Parser/selector coverage (notes)
+
+- Nested TCSS blocks with `&` replacement: Supported (basic parent + list expansion).
+- Nested selector lists (comma-separated) inside blocks: Supported.
+- Line (`# ...`) and block (`/* ... */`) comments: Supported in stylesheet parsing.
