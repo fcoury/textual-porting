@@ -36,8 +36,7 @@ Project-specific instructions for agents working in this repo.
 
 ## Code hygiene
 
-- After each feature implementation, run `cargo fmt --all` and `cargo clippy`.
-- Keep `textual-rs/examples/demo.rs` updated to exercise newly implemented features for visual/manual validation.
+- After each major feature implementation, run `cargo fmt --all` and `cargo clippy`.
 
 ## Examples workflow
 

@@ -5,8 +5,8 @@ Status legend: Supported | Partial | Missing
 | Python property | Rust status | Notes |
 |---|---|---|
 | `display` | Supported | Supported (block/none). |
-| `visibility` | Missing | Not implemented in Rust yet. |
-| `layout` | Missing | Not implemented in Rust yet. |
+| `visibility` | Supported | Implemented in DOM + layout render trees (hidden keeps layout space). |
+| `layout` | Supported | Added `layout: vertical|horizontal` with horizontal stacking in DOM. |
 | `auto_color` | Missing | Not implemented in Rust yet. |
 | `color` | Supported | CSS `color` implemented. |
 | `background` | Supported | CSS `background` implemented. |
@@ -16,8 +16,8 @@ Status legend: Supported | Partial | Missing
 | `text_opacity` | Supported | Supported as `text-opacity`. |
 | `padding` | Supported | CSS `padding` implemented. |
 | `margin` | Supported | CSS `margin` implemented. |
-| `offset` | Missing | Missing (no offset positioning yet). |
-| `position` | Missing | Missing (no relative/absolute positioning yet). |
+| `offset` | Supported | Implemented for DOM render tree + hit-testing (relative/absolute offsets). |
+| `position` | Supported | Relative/absolute positioning in DOM render tree. |
 | `border_top` | Missing | Not implemented in Rust yet. |
 | `border_right` | Missing | Not implemented in Rust yet. |
 | `border_bottom` | Missing | Not implemented in Rust yet. |
@@ -38,8 +38,8 @@ Status legend: Supported | Partial | Missing
 | `max_height` | Supported | CSS `max-height` implemented. |
 | `dock` | Missing | Not implemented in Rust yet. |
 | `split` | Missing | Not implemented in Rust yet. |
-| `overflow_x` | Partial | Partial: Rust has `overflow` (single axis). |
-| `overflow_y` | Partial | Partial: Rust has `overflow` (single axis). |
+| `overflow_x` | Supported | Axis-specific overflow now supported. |
+| `overflow_y` | Supported | Axis-specific overflow now supported. |
 | `layers` | Missing | Missing (Rust uses `z-index` but no named layers). |
 | `layer` | Missing | Missing (Rust uses `z-index` but no named layers). |
 | `transitions` | Missing | Missing (planned for Phase F). |

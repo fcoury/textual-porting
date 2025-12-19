@@ -12,6 +12,8 @@
   - Overflow clip for render tree + hit-testing.
 - Rendering integration:
   - z-index ordering (compositor + hit-test ordering).
+- Runtime/driver:
+  - Input polling tolerates EINTR from SIGWINCH (resize) without crashing.
 
 ## Parity Target (Python Textual)
 Python references for Phase D:
