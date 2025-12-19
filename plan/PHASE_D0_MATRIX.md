@@ -103,3 +103,12 @@ Status legend: Supported | Partial | Missing
 - Nested TCSS blocks with `&` replacement: Supported (basic parent + list expansion).
 - Nested selector lists (comma-separated) inside blocks: Supported.
 - Line (`# ...`) and block (`/* ... */`) comments: Supported in stylesheet parsing.
+
+## TCSS syntax inventory (docs/examples/tests)
+
+- Selectors: type/class/id/universal, compound selectors, descendant + child combinators, comma-separated selector lists.
+- Pseudo-classes seen in `.tcss`: `:focus`, `:hover`, `:enabled`, `:inline`.
+- `::` usage appears in `test_mega_stylesheet.tcss` (currently parsed as a type token in Rust; pseudo-element handling is missing).
+- Variables: `$var:` declarations + `$var` references (in mega stylesheet + tokenizer tests).
+- Values/functions: `rgb(...)`, `hsl(...)`, hex + named colors, `!important`.
+- Units/lengths: plain numbers, `%`, `fr`, `vw`, `vh`, `w`, `h`, durations `ms`/`s`, plus keyword `auto`.
