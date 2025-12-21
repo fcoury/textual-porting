@@ -7,5 +7,5 @@
 
 ## Phase 2: Mouse Support
 - [x] Task: Implement Hit-Testing algorithm (Coordinate -> WidgetID) [6b4de90]
-- [ ] Task: Integrate Mouse Event dispatching in `App::run`
+- [x] Task: Integrate Mouse Event dispatching in `App::run` [eb042a9]
 - [ ] Task: Conductor - User Manual Verification 'Mouse' (Protocol in workflow.md)
