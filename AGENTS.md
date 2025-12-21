@@ -2,6 +2,12 @@
 
 Project-specific instructions for agents working in this repo.
 
+## Textual python version
+
+- You MUST be as familiar as possible with the Textual Python codebase.
+- The features must be implemented in Rust to match the behavior of the Python version.
+- The python code is at the `textual` submodule.
+
 ## Git and submodules
 
 - This is the migration project for Textual's Python codebase to Rust.
@@ -16,7 +22,8 @@ Project-specific instructions for agents working in this repo.
 - Start a session: `tmux new -d -s codex-shell -n shell`
 - Run commands safely: `tmux send-keys -t codex-shell:0.0 -- 'cargo run --example demo' Enter`
 - Attach to watch: `tmux attach -t codex-shell`
-- Capture output (last 200 lines): `tmux capture-pane -p -J -t codex-shell:0.0 -S -200`
+- Capture output (last 200 lines): `tmux capture-pane -e -p -J -t codex-shell:0.0 -S -200`
+  - Use `-e` above to include escape sequences (colors).
 - If a run exceeds ~10 minutes, treat it as potentially hung and inspect via tmux.
 - Cleanup: `tmux kill-session -t codex-shell`
 
