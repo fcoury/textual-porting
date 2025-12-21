@@ -14,7 +14,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Interactivity - Focus & Input Handling
+## [~] Track: Interactivity - Focus & Input Handling
 *Link: [./conductor/tracks/interactivity_20251220/](./conductor/tracks/interactivity_20251220/)*
 
 ---
