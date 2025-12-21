@@ -21,8 +21,8 @@
 ### 3.1 Layout Trait Foundation
 - [x] Task: Define Layout trait with arrange() method [05e0196]
 - [x] Task: Define LayoutResult with widget placements [05e0196]
-- [~] Task: Implement layout selection based on widget type
-- [ ] Task: Write tests for Layout trait
+- [x] Task: Implement layout selection based on widget type [e59dc6f]
+- [x] Task: Write tests for Layout trait [e59dc6f]
 
 ### 3.2 Vertical Layout
 - [ ] Task: Implement VerticalLayout struct
