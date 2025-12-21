@@ -3,7 +3,7 @@
 ## Phase 1: Geometry & Constraints
 - [x] Task: Define `Size` (width/height) and `Constraint` enum (Length, Percentage, Auto) [78c464c]
 - [x] Task: Implement `Rect` logic (intersection, union, containment) [9889ca1]
-- [ ] Task: Conductor - User Manual Verification 'Geometry' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Geometry' (Protocol in workflow.md)
 
 ## Phase 2: The Layout Solver
 - [ ] Task: Implement the `Dock` layout algorithm
