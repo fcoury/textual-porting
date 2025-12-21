@@ -32,11 +32,11 @@
 - [x] Task: Write tests for vertical layout [f13cc30]
 
 ### 3.3 Horizontal Layout
-- [ ] Task: Implement HorizontalLayout struct
-- [ ] Task: Implement left-to-right stacking
-- [ ] Task: Handle min/max width constraints
-- [ ] Task: Implement flex space distribution
-- [ ] Task: Write tests for horizontal layout
+- [x] Task: Implement HorizontalLayout struct [deb14ae]
+- [x] Task: Implement left-to-right stacking [deb14ae]
+- [x] Task: Handle min/max width constraints [deb14ae]
+- [x] Task: Implement flex space distribution [deb14ae]
+- [x] Task: Write tests for horizontal layout [deb14ae]
 
 ### 3.4 Grid Layout
 - [ ] Task: Implement GridLayout struct
