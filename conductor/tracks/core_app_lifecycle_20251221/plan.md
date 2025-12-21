@@ -114,4 +114,4 @@ cargo test --all -- --test-threads=1
 ### Key Bindings Design Note
 The `+,=` binding pattern allows both keys to work, following Python Textual's UX pattern where `=` is provided as an easier alternative since `+` requires Shift on most keyboards.
 
-[checkpoint: pending]
+[checkpoint: 6ccd16f]
