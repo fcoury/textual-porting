@@ -101,7 +101,7 @@ This ensures nested scrollables don't render outside their parent's bounds.
 pub fn render_with_culling(
     root: WidgetId,
     registry: &WidgetRegistry,
-    layout_cache: &LayoutCache,
+    placement_cache: &PlacementCache,
     clip_region: Rect,
     buffer: &mut RenderBuffer,
 ) {
@@ -109,9 +109,10 @@ pub fn render_with_culling(
     let mut stack = vec![(root, clip_region, Offset::ZERO)];
 
     while let Some((widget_id, current_clip, screen_offset)) = stack.pop() {
-        let Some(region) = layout_cache.get(widget_id) else {
+        let Some(placement) = placement_cache.get_placement(widget_id) else {
             continue;
         };
+        let region = placement.region;
 
         // Transform widget region to screen space
         let screen_region = Rect::new(
@@ -131,12 +132,12 @@ pub fn render_with_culling(
         widget.render(visible, buffer);
 
         // Calculate child clip and transform
-        // NOTE: We need placement metadata to distinguish fixed vs scrolling children
+        // NOTE: PlacementCache provides metadata (fixed flag) for culling decisions
         let is_scrollable = registry.get_scroll_state(widget_id).is_some();
 
         for child_id in registry.children(widget_id) {
             // Get placement metadata to check if child is fixed
-            let child_placement = registry.get_placement(child_id);
+            let child_placement = placement_cache.get_placement(child_id);
             let is_fixed = child_placement.map(|p| p.fixed).unwrap_or(false);
 
             let (child_clip, child_offset) = if is_scrollable {
@@ -450,15 +451,14 @@ Full virtualization is only needed for extreme cases (10,000+ items). Basic cull
 
 ## Integration Points
 
-1. **LayoutCache**: Provides widget positions for culling checks
+1. **PlacementCache**: Stores full `WidgetPlacement` for positions and metadata (fixed flag, order)
 2. **ScrollState**: Defines the visible region for scrollable containers
 3. **RenderBuffer**: Receives only visible content
 4. **DirtyTracker**: Tracks what needs re-rendering
-5. **PlacementCache**: Stores full `WidgetPlacement` (not just `Rect`) for fixed-child handling
 
 ### PlacementCache Design
 
-The culling algorithm needs placement metadata (specifically the `fixed` flag) to correctly handle scrollbar children. The registry must store full placements:
+The culling algorithm needs placement metadata (specifically the `fixed` flag) to correctly handle scrollbar children. PlacementCache stores full placements:
 
 ```rust
 /// Cache storing layout results with full placement metadata.

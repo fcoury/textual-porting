@@ -47,8 +47,8 @@ The Layout System is responsible for sizing and positioning widgets within conta
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       LayoutCache                                │
-│         HashMap<WidgetId, Rect>  (widget positions)              │
+│                      PlacementCache                              │
+│    HashMap<WidgetId, WidgetPlacement>  (positions + metadata)    │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -74,9 +74,9 @@ The Layout System is responsible for sizing and positioning widgets within conta
    - Positions widgets
    - Returns `Vec<WidgetPlacement>`
 
-3. **LayoutCache** stores results:
-   - Maps WidgetId → Rect
-   - Used for rendering and hit-testing
+3. **PlacementCache** stores results:
+   - Maps WidgetId → WidgetPlacement (region + fixed flag + order)
+   - Used for rendering, hit-testing, and culling decisions
 
 4. **Rendering** uses cache:
    - Culls off-screen widgets
