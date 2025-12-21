@@ -19,5 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [~] Track: Standard Library - Base Widgets
-*Link: [./conductor/tracks/std_widgets_20251220/](./conductor/tracks/std_widgets_20251220/)*
+## [x] Track: Standard Library - Base Widgets (ARCHIVED)
+*Link: [./conductor/tracks/_archive/std_widgets_20251220/](./conductor/tracks/_archive/std_widgets_20251220/)*
