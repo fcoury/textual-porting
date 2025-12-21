@@ -2,7 +2,7 @@
 
 ## Phase 1: TCSS Parser
 - [x] Task: Add `nom` or `pest` to Cargo.toml [6a38ef5]
-- [ ] Task: Implement parser for CSS selectors (Class, ID, Type)
+- [x] Task: Implement parser for CSS selectors (Class, ID, Type) [c1b7446]
 - [ ] Task: Implement parser for basic declarations (color, background)
 - [ ] Task: Conductor - User Manual Verification 'TCSS Parser' (Protocol in workflow.md)
 
