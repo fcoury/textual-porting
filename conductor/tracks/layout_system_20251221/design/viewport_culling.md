@@ -11,19 +11,52 @@ When a ScrollView contains many widgets, rendering all of them every frame is wa
 - Processing them consumes CPU time
 - Memory for their render output is allocated unnecessarily
 
+## Coordinate Spaces
+
+**CRITICAL:** Understanding coordinate spaces is essential for correct culling.
+
+### Coordinate Space Definitions
+
+1. **Screen Space**: Absolute coordinates on the terminal (0,0 = top-left)
+2. **Parent Space**: Coordinates relative to parent widget's origin
+3. **Content Space**: Coordinates within scrollable content (can be negative when scrolled)
+
+### ScrollView Coordinate Mapping
+
+```
+Screen Space           Parent Space          Content Space
+┌────────────┐        ┌────────────┐        ┌────────────────┐
+│ (50,10)    │   →    │ (0,0)      │   →    │ (scroll_x,     │
+│   ScrollView        │   ScrollView         │  scroll_y)     │
+│            │        │            │        │     = visible  │
+└────────────┘        └────────────┘        └────────────────┘
+```
+
+When content is placed at `(-scroll_x, -scroll_y)` in parent space:
+- Content at `(0, 0)` in content space appears at `(-scroll_x, -scroll_y)` in parent space
+- The visible region in **content space** is `(scroll_x, scroll_y, viewport_w, viewport_h)`
+- The visible region in **parent space** is `(0, 0, viewport_w, viewport_h)`
+
 ## Culling Strategy
 
 ### 1. Visible Region Calculation
 
 ```rust
-/// Calculate the visible region for a scrollable container.
-pub fn visible_region(scroll: &ScrollState) -> Rect {
+/// Calculate the visible region in CONTENT SPACE for a scrollable container.
+/// This is where the content coordinates that are currently visible fall.
+pub fn visible_content_region(scroll: &ScrollState) -> Rect {
     Rect::new(
         scroll.offset.x,
         scroll.offset.y,
         scroll.viewport_size.width,
         scroll.viewport_size.height,
     )
+}
+
+/// Calculate the visible region in PARENT SPACE for a scrollable container.
+/// This is always (0, 0) relative to the ScrollView's origin.
+pub fn visible_parent_region(scroll: &ScrollState) -> Rect {
+    Rect::new(0, 0, scroll.viewport_size.width, scroll.viewport_size.height)
 }
 ```
 
@@ -57,8 +90,14 @@ impl Rect {
 
 ### 3. Culling During Render
 
+**IMPORTANT:** Child clip must **intersect** with parent clip, not replace it.
+This ensures nested scrollables don't render outside their parent's bounds.
+
 ```rust
 /// Render tree with culling.
+///
+/// clip_region is in SCREEN SPACE - the absolute screen coordinates
+/// that are valid for rendering.
 pub fn render_with_culling(
     root: WidgetId,
     registry: &WidgetRegistry,
@@ -66,15 +105,24 @@ pub fn render_with_culling(
     clip_region: Rect,
     buffer: &mut RenderBuffer,
 ) {
-    let mut stack = vec![(root, clip_region)];
+    // Stack holds (widget_id, clip_in_screen_space, transform_to_screen)
+    let mut stack = vec![(root, clip_region, Offset::ZERO)];
 
-    while let Some((widget_id, current_clip)) = stack.pop() {
+    while let Some((widget_id, current_clip, screen_offset)) = stack.pop() {
         let Some(region) = layout_cache.get(widget_id) else {
             continue;
         };
 
+        // Transform widget region to screen space
+        let screen_region = Rect::new(
+            region.x + screen_offset.x,
+            region.y + screen_offset.y,
+            region.width,
+            region.height,
+        );
+
         // Culling: skip if widget is completely outside clip region
-        let Some(visible) = region.intersection(&current_clip) else {
+        let Some(visible) = screen_region.intersection(&current_clip) else {
             continue;  // Widget is off-screen, skip it entirely
         };
 
@@ -82,16 +130,36 @@ pub fn render_with_culling(
         let widget = registry.get_widget(widget_id);
         widget.render(visible, buffer);
 
-        // Process children with updated clip region
-        // For scrollable containers, adjust clip by scroll offset
-        let child_clip = if let Some(scroll) = registry.get_scroll_state(widget_id) {
-            visible_region(scroll)
+        // Calculate child clip and transform
+        let (child_clip, child_offset) = if let Some(scroll) = registry.get_scroll_state(widget_id) {
+            // Scrollable container: clip to viewport AND intersect with parent clip
+            let viewport_in_screen = Rect::new(
+                screen_region.x,
+                screen_region.y,
+                scroll.viewport_size.width,
+                scroll.viewport_size.height,
+            );
+            // CRITICAL: Intersect with parent clip to prevent rendering outside parent bounds
+            let clipped_viewport = viewport_in_screen.intersection(&current_clip)
+                .unwrap_or(Rect::ZERO);
+
+            // Children are offset by scroll position (content placed at negative offset)
+            let child_screen_offset = Offset {
+                x: screen_region.x - scroll.offset.x,
+                y: screen_region.y - scroll.offset.y,
+            };
+            (clipped_viewport, child_screen_offset)
         } else {
-            visible
+            // Non-scrollable: children inherit current clip, offset by widget position
+            let child_screen_offset = Offset {
+                x: screen_offset.x + region.x,
+                y: screen_offset.y + region.y,
+            };
+            (visible, child_screen_offset)
         };
 
         for child_id in registry.children(widget_id) {
-            stack.push((child_id, child_clip));
+            stack.push((child_id, child_clip, child_offset));
         }
     }
 }

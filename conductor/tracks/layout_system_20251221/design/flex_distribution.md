@@ -54,9 +54,14 @@ enum SizeSpec {
 ### Phase 2: Resolve Non-Fraction Sizes
 
 ```rust
+/// Resolve non-fraction sizes.
+///
+/// IMPORTANT: `container_size` is the original container size (before gutters).
+/// Percent sizes are relative to container, not available space after gutters.
+/// This matches CSS/Textual behavior.
 fn resolve_non_fractions(
     items: &mut [FlexItem],
-    total_space: u16,
+    container_size: u16,  // Original container size (for percent calculation)
     context: &LayoutContext,
 ) -> u16 {
     let mut consumed = 0u16;
@@ -70,7 +75,9 @@ fn resolve_non_fractions(
                 consumed += clamped;
             }
             SizeSpec::Percent(pct) => {
-                let size = ((pct / 100.0) * total_space as f32) as u16;
+                // IMPORTANT: Percent is relative to CONTAINER size, not available space
+                // This matches CSS/Textual behavior where 50% always means 50% of container
+                let size = ((pct / 100.0) * container_size as f32) as u16;
                 let clamped = size.clamp(item.min, item.max);
                 item.resolved = Some(clamped);
                 item.locked = true;
@@ -100,11 +107,30 @@ fn resolve_non_fractions(
 This is the iterative constraint resolution loop:
 
 ```rust
+/// Distribute remaining space among fractional items.
+///
+/// IMPORTANT: This handles the case where min constraints exceed available space.
+/// In that case, items get their min size and we accept overflow.
 fn distribute_fractions(
     items: &mut [FlexItem],
-    remaining_space: u16,
+    remaining_space: i32,  // Can be negative if fixed items exceed available
 ) {
     let mut space_left = remaining_space as f32;
+
+    // OVERFLOW HANDLING: If space is already negative or zero,
+    // fractional items get their minimum size (or 0 if no min).
+    // This can result in overflow which the container handles via scrolling/clipping.
+    if space_left <= 0.0 {
+        for item in items.iter_mut() {
+            if item.locked || item.fraction.is_none() {
+                continue;
+            }
+            // Give each fractional item its minimum size (accepting overflow)
+            item.resolved = Some(item.min);
+            item.locked = true;
+        }
+        return;
+    }
 
     loop {
         // Calculate total fraction units among unlocked items
@@ -118,8 +144,8 @@ fn distribute_fractions(
             break;
         }
 
-        // Calculate size of 1fr
-        let fr_unit = space_left / total_fr;
+        // Calculate size of 1fr (guaranteed positive since we checked space_left > 0)
+        let fr_unit = (space_left / total_fr).max(0.0);
         let mut changed = false;
 
         for item in items.iter_mut() {
@@ -135,6 +161,7 @@ fn distribute_fractions(
                 item.resolved = Some(item.min);
                 item.locked = true;
                 space_left -= item.min as f32;
+                // If this drives space negative, subsequent items will get 0 from fr_unit.max(0)
                 changed = true;
             }
             // Check max constraint
@@ -214,10 +241,13 @@ pub fn resolve_flex_sizes(
         .collect();
 
     // Phase 1: Resolve non-fraction sizes
-    let consumed = resolve_non_fractions(&mut flex_items, available, context);
+    // IMPORTANT: Pass total_space (container size) for percent calculation,
+    // not available (which has gutters subtracted)
+    let consumed = resolve_non_fractions(&mut flex_items, total_space, context);
 
     // Phase 2: Distribute remaining space to fractions
-    let remaining = available.saturating_sub(consumed);
+    // Use i32 to handle overflow case where consumed > available
+    let remaining = available as i32 - consumed as i32;
     distribute_fractions(&mut flex_items, remaining);
 
     // Return results

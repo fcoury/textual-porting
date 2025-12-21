@@ -46,6 +46,39 @@ pub trait Layout: Debug + Send + Sync {
         greedy: bool,
     ) -> Vec<WidgetPlacement>;
 
+    /// Get the content width for this layout (for auto sizing parent containers).
+    ///
+    /// This is called when the parent has `width: auto` and needs to know
+    /// how wide its content would be. Default returns 0 (unknown).
+    fn get_content_width(
+        &self,
+        context: &LayoutContext,
+        children: &[WidgetId],
+        container: Size,
+    ) -> u16 {
+        // Default implementation: sum of child content widths (vertical)
+        // or max of child content widths (horizontal) - override as needed
+        let _ = (context, children, container);
+        0
+    }
+
+    /// Get the content height for this layout given a width (for auto sizing).
+    ///
+    /// This is called when the parent has `height: auto` and needs to know
+    /// how tall its content would be at a given width.
+    fn get_content_height(
+        &self,
+        context: &LayoutContext,
+        children: &[WidgetId],
+        container: Size,
+        width: u16,
+    ) -> u16 {
+        // Default implementation: sum of child content heights (vertical)
+        // Override for horizontal layouts, grids, etc.
+        let _ = (context, children, container, width);
+        0
+    }
+
     /// Get the name of this layout (for debugging).
     fn name(&self) -> &'static str;
 }
@@ -223,6 +256,71 @@ arrange(parent, children, size, viewport)
         ├── Apply alignment (horizontal, vertical)
         ├── Translate placements
         └── Apply absolute positioning
+```
+
+## Absolute and Overlay Positioning
+
+Widgets with absolute positioning or overlay behavior are excluded from normal layout flow:
+
+```rust
+/// Position type for widgets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Position {
+    /// Normal flow - participates in parent layout.
+    #[default]
+    Relative,
+    /// Absolute positioning relative to parent.
+    /// Removed from normal flow; other widgets don't see it.
+    Absolute,
+}
+
+/// Check if a widget should participate in layout flow.
+pub fn in_layout_flow(context: &LayoutContext, id: WidgetId) -> bool {
+    let styles = context.styles(id);
+    // Absolute-positioned and overlay widgets don't participate in flow
+    styles.position != Position::Absolute && !styles.overlay
+}
+```
+
+### Filtering During Arrange
+
+The arrange algorithm filters out non-flow widgets before calling Layout:
+
+```rust
+// In arrange():
+let flow_children: Vec<WidgetId> = children
+    .iter()
+    .filter(|&id| in_layout_flow(context, *id))
+    .copied()
+    .collect();
+
+// Layout only operates on flow children
+let placements = layout.arrange(context, parent_id, &flow_children, size, greedy);
+
+// Absolute/overlay widgets are handled separately
+let absolute_children: Vec<WidgetId> = children
+    .iter()
+    .filter(|&id| !in_layout_flow(context, *id))
+    .copied()
+    .collect();
+
+for id in absolute_children {
+    let styles = context.styles(id);
+    let box_model = context.box_model(id, size, None, None, false);
+
+    // Position relative to parent using offset styles (top, left, etc.)
+    let x = styles.left.unwrap_or(0);
+    let y = styles.top.unwrap_or(0);
+
+    placements.push(WidgetPlacement {
+        widget_id: id,
+        region: Rect::new(x, y, box_model.width, box_model.height),
+        offset: Offset::ZERO,
+        margin: box_model.margin,
+        order: if styles.overlay { i32::MAX - 1 } else { 0 },
+        fixed: styles.overlay,  // Overlay widgets don't scroll
+    });
+}
 ```
 
 ## Design Decisions

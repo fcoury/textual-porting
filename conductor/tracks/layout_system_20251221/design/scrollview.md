@@ -131,35 +131,25 @@ impl ScrollView {
     ) -> Vec<WidgetPlacement> {
         let styles = context.styles(self.id);
         let overflow = styles.overflow;
-
-        // Determine scrollbar visibility
-        let show_v = self.should_show_vscrollbar(overflow.y, available_size);
-        let show_h = self.should_show_hscrollbar(overflow.x, available_size);
-
-        // Calculate viewport size (excluding scrollbars)
         let scrollbar_width = styles.scrollbar_size.0;
         let scrollbar_height = styles.scrollbar_size.1;
 
-        let viewport_width = if show_v {
-            available_size.width.saturating_sub(scrollbar_width)
-        } else {
-            available_size.width
-        };
-        let viewport_height = if show_h {
-            available_size.height.saturating_sub(scrollbar_height)
-        } else {
-            available_size.height
-        };
+        // TWO-PASS SCROLLBAR VISIBILITY RESOLUTION
+        // The cross-axis dependency (vertical scrollbar reduces width, which may
+        // require horizontal scrollbar, which reduces height, etc.) requires
+        // iterative resolution to converge.
 
-        let viewport_size = Size::new(viewport_width, viewport_height);
+        let (show_v, show_h, viewport_size, content_size) = self.resolve_scrollbar_visibility(
+            context,
+            available_size,
+            overflow,
+            scrollbar_width,
+            scrollbar_height,
+        );
 
-        // Get content's natural size
-        let content_width = context.content_width(self.content, viewport_size);
-        let content_height = context.content_height(self.content, viewport_size, content_width);
-
-        // Update scroll state
+        // Update scroll state with final resolved sizes
         self.scroll.viewport_size = viewport_size;
-        self.scroll.virtual_size = Size::new(content_width, content_height);
+        self.scroll.virtual_size = content_size;
         self.scroll.offset = self.scroll.clamp_offset(self.scroll.offset);
 
         // Build placements
@@ -171,8 +161,8 @@ impl ScrollView {
             region: Rect::new(
                 -self.scroll.offset.x,
                 -self.scroll.offset.y,
-                content_width,
-                content_height,
+                content_size.width,
+                content_size.height,
             ),
             offset: Offset::ZERO,
             margin: Spacing::ZERO,
@@ -185,10 +175,10 @@ impl ScrollView {
             placements.push(WidgetPlacement {
                 widget_id: self.v_scrollbar.unwrap(),
                 region: Rect::new(
-                    viewport_width as i16,
+                    viewport_size.width as i16,
                     0,
                     scrollbar_width,
-                    if show_h { viewport_height } else { available_size.height },
+                    if show_h { viewport_size.height } else { available_size.height },
                 ),
                 offset: Offset::ZERO,
                 margin: Spacing::ZERO,
@@ -203,8 +193,8 @@ impl ScrollView {
                 widget_id: self.h_scrollbar.unwrap(),
                 region: Rect::new(
                     0,
-                    viewport_height as i16,
-                    if show_v { viewport_width } else { available_size.width },
+                    viewport_size.height as i16,
+                    if show_v { viewport_size.width } else { available_size.width },
                     scrollbar_height,
                 ),
                 offset: Offset::ZERO,
@@ -219,8 +209,8 @@ impl ScrollView {
             placements.push(WidgetPlacement {
                 widget_id: self.corner.unwrap(),
                 region: Rect::new(
-                    viewport_width as i16,
-                    viewport_height as i16,
+                    viewport_size.width as i16,
+                    viewport_size.height as i16,
                     scrollbar_width,
                     scrollbar_height,
                 ),
@@ -233,22 +223,101 @@ impl ScrollView {
 
         placements
     }
+
+    /// Iteratively resolve scrollbar visibility until convergence.
+    /// This handles the cross-axis dependency where showing one scrollbar
+    /// can trigger the need for the other.
+    fn resolve_scrollbar_visibility(
+        &self,
+        context: &LayoutContext,
+        available_size: Size,
+        overflow: OverflowSettings,
+        scrollbar_width: u16,
+        scrollbar_height: u16,
+    ) -> (bool, bool, Size, Size) {
+        // Start with no scrollbars
+        let mut show_v = overflow.y == Overflow::Scroll;
+        let mut show_h = overflow.x == Overflow::Scroll;
+
+        // Iterate until convergence (max 3 iterations to prevent infinite loops)
+        for _ in 0..3 {
+            let prev_v = show_v;
+            let prev_h = show_h;
+
+            // Calculate viewport given current scrollbar state
+            let viewport_width = if show_v {
+                available_size.width.saturating_sub(scrollbar_width)
+            } else {
+                available_size.width
+            };
+            let viewport_height = if show_h {
+                available_size.height.saturating_sub(scrollbar_height)
+            } else {
+                available_size.height
+            };
+            let viewport_size = Size::new(viewport_width, viewport_height);
+
+            // Get content size for this viewport
+            let content_width = context.content_width(self.content, viewport_size);
+            let content_height = context.content_height(self.content, viewport_size, content_width);
+
+            // Re-evaluate scrollbar visibility based on content size
+            show_v = match overflow.y {
+                Overflow::Hidden => false,
+                Overflow::Scroll => true,
+                Overflow::Auto => content_height > viewport_height,
+            };
+            show_h = match overflow.x {
+                Overflow::Hidden => false,
+                Overflow::Scroll => true,
+                Overflow::Auto => content_width > viewport_width,
+            };
+
+            // Converged?
+            if show_v == prev_v && show_h == prev_h {
+                return (show_v, show_h, viewport_size, Size::new(content_width, content_height));
+            }
+        }
+
+        // Return final state after max iterations
+        let viewport_width = if show_v {
+            available_size.width.saturating_sub(scrollbar_width)
+        } else {
+            available_size.width
+        };
+        let viewport_height = if show_h {
+            available_size.height.saturating_sub(scrollbar_height)
+        } else {
+            available_size.height
+        };
+        let viewport_size = Size::new(viewport_width, viewport_height);
+        let content_width = context.content_width(self.content, viewport_size);
+        let content_height = context.content_height(self.content, viewport_size, content_width);
+
+        (show_v, show_h, viewport_size, Size::new(content_width, content_height))
+    }
 }
 ```
 
-### 2. Scrollbar Visibility Logic
+### 2. Scrollbar Visibility (Handled by resolve_scrollbar_visibility above)
+
+The `should_show_*` helpers are replaced by the iterative `resolve_scrollbar_visibility` method which:
+1. Starts with forced scrollbars only (overflow: scroll)
+2. Calculates viewport → content size → visibility
+3. Repeats until stable (usually 1-2 iterations)
 
 ```rust
+// DEPRECATED - replaced by resolve_scrollbar_visibility
 impl ScrollView {
-    fn should_show_vscrollbar(&self, overflow: Overflow, size: Size) -> bool {
+    fn should_show_vscrollbar(&self, overflow: Overflow, viewport_height: u16, content_height: u16) -> bool {
         match overflow {
             Overflow::Hidden => false,
             Overflow::Scroll => true,
-            Overflow::Auto => self.scroll.virtual_size.height > size.height,
+            Overflow::Auto => content_height > viewport_height,
         }
     }
 
-    fn should_show_hscrollbar(&self, overflow: Overflow, size: Size) -> bool {
+    fn should_show_hscrollbar(&self, overflow: Overflow, viewport_width: u16, content_width: u16) -> bool {
         match overflow {
             Overflow::Hidden => false,
             Overflow::Scroll => true,
