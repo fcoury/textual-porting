@@ -170,7 +170,7 @@ return (placements, dock_spacing)
 ### Key Points
 
 - Docked widgets get Z-order `TOP_Z` (highest, always on top)
-- Multiple widgets can dock to same edge (they stack)
+- Multiple widgets docked to the same edge **overlap** (all positioned at the edge); `max()` ensures spacing accounts for the largest
 - Returns spacing that reduces the content area
 
 ## Split Widget Arrangement

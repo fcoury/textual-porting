@@ -50,8 +50,8 @@ def arrange(self, parent, children, size, greedy=True):
     gutter_horizontal = styles.grid_gutter_horizontal  # Between rows
     gutter_vertical = styles.grid_gutter_vertical      # Between columns
 
-    # Determine number of columns
-    table_size_columns = max(1, styles.grid_size_columns)
+    # Determine number of columns (default to 1 if not set)
+    table_size_columns = max(1, styles.grid_size_columns or 1)
     container_width = size.width
 
     # Handle max_column_width: limit container to fit max columns
@@ -86,7 +86,8 @@ Auto-placement algorithm (similar to CSS Grid auto-placement):
 ```python
 # Maps (col, row) -> (Widget, is_origin_cell)
 cell_map: dict[tuple[int, int], tuple[Widget, bool]] = {}
-# Maps Widget -> (start_col, start_row, col_span, row_span) - NOTE: actual spans, not span-1
+# Maps Widget -> (start_col, start_row, col_span_offset, row_span_offset)
+# NOTE: Stores span-1 values for later indexing (see NOTE below)
 cell_size_map: dict[Widget, tuple[int, int, int, int]] = {}
 
 def cell_coords(column_count):
@@ -144,6 +145,8 @@ for column, scalar in enumerate(column_scalars):
                 widget, is_origin = cell_entry
                 # Only count single-span widgets for auto sizing
                 if widget.styles.column_span == 1:
+                    # widget.styles.gutter is the widget's own margin/padding,
+                    # NOT the grid gutter. This accounts for the widget's total space.
                     width = max(
                         width,
                         widget.get_content_width(size, viewport) + widget.styles.gutter.width
