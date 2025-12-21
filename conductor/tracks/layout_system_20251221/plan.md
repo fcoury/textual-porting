@@ -39,12 +39,12 @@
 - [x] Task: Write tests for horizontal layout [deb14ae]
 
 ### 3.4 Grid Layout
-- [ ] Task: Implement GridLayout struct
-- [ ] Task: Implement grid template parsing (columns, rows)
-- [ ] Task: Implement explicit cell placement
-- [ ] Task: Implement auto-placement algorithm
-- [ ] Task: Implement gap between cells
-- [ ] Task: Write tests for grid layout
+- [x] Task: Implement GridLayout struct [a1a7796]
+- [x] Task: Implement grid template parsing (columns, rows) [a1a7796]
+- [x] Task: Implement explicit cell placement [a1a7796]
+- [x] Task: Implement auto-placement algorithm [a1a7796]
+- [x] Task: Implement gap between cells [a1a7796]
+- [x] Task: Write tests for grid layout [a1a7796]
 
 ### 3.5 Container Widgets
 - [ ] Task: Implement Vertical container widget
