@@ -4,12 +4,12 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [~] Track: Layout Engine - Geometry & Constraints
-*Link: [./conductor/tracks/layout_engine_20251220/](./conductor/tracks/layout_engine_20251220/)*
+## [x] Track: Layout Engine - Geometry & Constraints (ARCHIVED)
+*Link: [./conductor/tracks/_archive/layout_engine_20251220/](./conductor/tracks/_archive/layout_engine_20251220/)*
 
 ---
 
-## [ ] Track: Styling System - TCSS Parser & Cascading
+## [~] Track: Styling System - TCSS Parser & Cascading
 *Link: [./conductor/tracks/styling_system_20251220/](./conductor/tracks/styling_system_20251220/)*
 
 ---
