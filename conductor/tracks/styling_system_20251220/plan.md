@@ -7,7 +7,7 @@
 - [x] Task: Conductor - User Manual Verification 'TCSS Parser' (Protocol in workflow.md)
 
 ## Phase 2: Cascading Logic
-- [ ] Task: Implement `Specificity` calculation for selectors
+- [x] Task: Implement `Specificity` calculation for selectors [a45e9e3]
 - [ ] Task: Implement `StyleSheet` struct to hold rules
 - [ ] Task: Implement `compute_style(widget_id, registry, stylesheet)`
 - [ ] Task: Conductor - User Manual Verification 'Cascading' (Protocol in workflow.md)
