@@ -1,7 +1,7 @@
 # Plan: Layout System
 
 ## Phase 1: Analysis & Research
-- [ ] Task: Study Python Textual layouts/vertical.py and horizontal.py
+- [x] Task: Study Python Textual layouts/vertical.py and horizontal.py [4723bc9]
 - [ ] Task: Analyze layouts/grid.py for CSS Grid implementation
 - [ ] Task: Study _arrange.py for the arrangement algorithm
 - [ ] Task: Document scroll_view.py and scrollbar.py implementation
