@@ -72,8 +72,8 @@
 - [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [40f8276]
 
 ## Phase 4: Testing & Verification
-- [ ] Task: Create integration tests with nested layouts
-- [ ] Task: Create example app with scrolling grid
-- [ ] Task: Run all tests and fix failures
-- [ ] Task: Performance test with 1000+ widgets
+- [x] Task: Create integration tests with nested layouts [32f88f3]
+- [x] Task: Create example app with scrolling grid [32f88f3]
+- [x] Task: Run all tests and fix failures [32f88f3]
+- [x] Task: Performance test with 1000+ widgets [32f88f3]
 - [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
