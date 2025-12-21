@@ -1,0 +1,13 @@
+# Plan: Styling System
+
+## Phase 1: TCSS Parser
+- [ ] Task: Add `nom` or `pest` to Cargo.toml
+- [ ] Task: Implement parser for CSS selectors (Class, ID, Type)
+- [ ] Task: Implement parser for basic declarations (color, background)
+- [ ] Task: Conductor - User Manual Verification 'TCSS Parser' (Protocol in workflow.md)
+
+## Phase 2: Cascading Logic
+- [ ] Task: Implement `Specificity` calculation for selectors
+- [ ] Task: Implement `StyleSheet` struct to hold rules
+- [ ] Task: Implement `compute_style(widget_id, registry, stylesheet)`
+- [ ] Task: Conductor - User Manual Verification 'Cascading' (Protocol in workflow.md)
