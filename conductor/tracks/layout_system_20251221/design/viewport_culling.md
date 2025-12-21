@@ -450,59 +450,128 @@ pub fn handle_scroll(
     placement_cache: &PlacementCache,
     dirty: &mut DirtyTracker,
 ) {
-    // Calculate the exposed region in content space
     let scroll = registry.get_scroll_state(scroll_view).unwrap();
     let viewport = scroll.viewport_size;
 
-    // Find widgets that were off-screen but are now visible
-    let newly_visible = find_widgets_in_exposed_region(
-        scroll_view,
-        old_offset,
-        new_offset,
-        viewport,
+    // Calculate exposed regions in CONTENT SPACE (what's newly visible)
+    let exposed_rects = calculate_exposed_regions(old_offset, new_offset, viewport);
+
+    if exposed_rects.is_empty() {
+        return;
+    }
+
+    // Get the content widget (ScrollView's single child that contains all scrollable content)
+    let content_id = registry.children(scroll_view).next().unwrap();
+
+    // Traverse content subtree, accumulating coordinates to content space
+    let newly_visible = find_widgets_in_regions(
+        content_id,
+        Offset::ZERO,  // Content widget is at (0,0) in content space
+        &exposed_rects,
         registry,
         placement_cache,
     );
 
-    // Mark them dirty so they render
     dirty.mark_widgets_dirty(newly_visible);
 }
 
-/// Find widgets in the newly exposed region after scroll.
-fn find_widgets_in_exposed_region(
-    scroll_view: WidgetId,
+/// Calculate newly exposed regions based on scroll delta.
+/// Returns rectangles in CONTENT SPACE.
+fn calculate_exposed_regions(
     old_offset: Offset,
     new_offset: Offset,
     viewport: Size,
-    registry: &WidgetRegistry,
-    placement_cache: &PlacementCache,
-) -> Vec<WidgetId> {
-    // Calculate exposed strip based on scroll direction
-    let exposed = if new_offset.y > old_offset.y {
+) -> Vec<Rect> {
+    let mut exposed = Vec::new();
+    let dx = new_offset.x - old_offset.x;
+    let dy = new_offset.y - old_offset.y;
+
+    // Vertical scroll
+    if dy > 0 {
         // Scrolled down: bottom strip is newly visible
-        let dy = new_offset.y - old_offset.y;
-        Rect::new(
+        exposed.push(Rect::new(
             new_offset.x,
             new_offset.y + viewport.height as i16 - dy,
             viewport.width,
             dy as u16,
-        )
-    } else if new_offset.y < old_offset.y {
+        ));
+    } else if dy < 0 {
         // Scrolled up: top strip is newly visible
-        Rect::new(new_offset.x, new_offset.y, viewport.width, (old_offset.y - new_offset.y) as u16)
-    } else {
-        return vec![];  // No vertical scroll
-    };
-    // Similar for horizontal...
+        exposed.push(Rect::new(
+            new_offset.x,
+            new_offset.y,
+            viewport.width,
+            (-dy) as u16,
+        ));
+    }
 
-    // Find widgets intersecting the exposed region (in content space)
-    registry.children(scroll_view)
-        .filter(|&id| {
-            placement_cache.get_placement(id)
-                .map(|p| p.region.intersects(&exposed))
-                .unwrap_or(false)
-        })
-        .collect()
+    // Horizontal scroll
+    if dx > 0 {
+        // Scrolled right: right strip is newly visible
+        exposed.push(Rect::new(
+            new_offset.x + viewport.width as i16 - dx,
+            new_offset.y,
+            dx as u16,
+            viewport.height,
+        ));
+    } else if dx < 0 {
+        // Scrolled left: left strip is newly visible
+        exposed.push(Rect::new(
+            new_offset.x,
+            new_offset.y,
+            (-dx) as u16,
+            viewport.height,
+        ));
+    }
+
+    exposed
+}
+
+/// Find all widgets in a subtree that intersect any of the given regions.
+/// Traverses descendants and accumulates coordinates to content space.
+fn find_widgets_in_regions(
+    widget_id: WidgetId,
+    content_offset: Offset,  // Accumulated offset from content root
+    exposed_rects: &[Rect],
+    registry: &WidgetRegistry,
+    placement_cache: &PlacementCache,
+) -> Vec<WidgetId> {
+    let mut result = Vec::new();
+
+    let Some(placement) = placement_cache.get_placement(widget_id) else {
+        return result;
+    };
+
+    // Transform widget region to CONTENT SPACE by adding accumulated offset
+    let content_region = Rect::new(
+        placement.region.x + content_offset.x,
+        placement.region.y + content_offset.y,
+        placement.region.width,
+        placement.region.height,
+    );
+
+    // Check if this widget intersects any exposed region
+    if exposed_rects.iter().any(|r| r.intersects(&content_region)) {
+        result.push(widget_id);
+    }
+
+    // Recurse into children with updated offset
+    let child_offset = Offset {
+        x: content_offset.x + placement.region.x,
+        y: content_offset.y + placement.region.y,
+    };
+
+    for child_id in registry.children(widget_id) {
+        result.extend(find_widgets_in_regions(
+            child_id,
+            child_offset,
+            exposed_rects,
+            registry,
+            placement_cache,
+        ));
+    }
+
+    result
 }
 ```
 
@@ -601,8 +670,9 @@ impl VirtualList {
 ### 1. Intersection-Based Culling
 Simple bounding box intersection is fast (O(1) per widget) and handles most cases. More sophisticated spatial data structures (quadtrees, R-trees) are overkill for typical UI hierarchies.
 
-### 2. Conservative Dirty Tracking
-We track rectangular regions rather than individual pixels. This is simpler and still provides significant optimization for partial updates.
+### 2. Two-Level Dirty Tracking
+- **DirtyTracker** uses widget IDs (not regions) to track which widgets need re-rendering. This avoids coordinate space issues between parent-space placement and screen-space rendering.
+- **DamageTracker** uses screen-space rectangles for terminal output optimization. Damage is recorded during render when coordinates are already transformed.
 
 ### 3. Top-Down Traversal with Clip Propagation
 Clip regions are propagated down the tree, allowing early termination when an entire subtree is off-screen.
