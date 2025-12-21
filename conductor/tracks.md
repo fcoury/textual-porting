@@ -9,8 +9,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [x] Track: Styling System - TCSS Parser & Cascading
-*Link: [./conductor/tracks/styling_system_20251220/](./conductor/tracks/styling_system_20251220/)*
+## [x] Track: Styling System - TCSS Parser & Cascading (ARCHIVED)
+*Link: [./conductor/tracks/_archive/styling_system_20251220/](./conductor/tracks/_archive/styling_system_20251220/)*
 
 ---
 
