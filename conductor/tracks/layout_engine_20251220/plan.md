@@ -1,6 +1,6 @@
 # Plan: Layout Engine
 
-## Phase 1: Geometry & Constraints
+## Phase 1: Geometry & Constraints [checkpoint: 22d0538]
 - [x] Task: Define `Size` (width/height) and `Constraint` enum (Length, Percentage, Auto) [78c464c]
 - [x] Task: Implement `Rect` logic (intersection, union, containment) [9889ca1]
 - [x] Task: Conductor - User Manual Verification 'Geometry' (Protocol in workflow.md)
