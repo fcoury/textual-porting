@@ -1,8 +1,8 @@
 # Plan: Interactivity
 
 ## Phase 1: Focus Management
-- [ ] Task: Implement `FocusManager` struct in `App`
-- [ ] Task: Implement `Tab` cycling logic (finding next focusable widget)
+- [x] Task: Implement `FocusManager` struct in `App` [c0fb663]
+- [x] Task: Implement `Tab` cycling logic (finding next focusable widget) [c0fb663]
 - [ ] Task: Conductor - User Manual Verification 'Focus' (Protocol in workflow.md)
 
 ## Phase 2: Mouse Support
