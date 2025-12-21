@@ -14,10 +14,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [~] Track: Interactivity - Focus & Input Handling
-*Link: [./conductor/tracks/interactivity_20251220/](./conductor/tracks/interactivity_20251220/)*
+## [x] Track: Interactivity - Focus & Input Handling (ARCHIVED)
+*Link: [./conductor/tracks/_archive/interactivity_20251220/](./conductor/tracks/_archive/interactivity_20251220/)*
 
 ---
 
-## [ ] Track: Standard Library - Base Widgets
+## [~] Track: Standard Library - Base Widgets
 *Link: [./conductor/tracks/std_widgets_20251220/](./conductor/tracks/std_widgets_20251220/)*
