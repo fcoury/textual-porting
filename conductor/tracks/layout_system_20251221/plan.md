@@ -25,11 +25,11 @@
 - [x] Task: Write tests for Layout trait [e59dc6f]
 
 ### 3.2 Vertical Layout
-- [ ] Task: Implement VerticalLayout struct
-- [ ] Task: Implement top-to-bottom stacking
-- [ ] Task: Handle min/max height constraints
-- [ ] Task: Implement flex space distribution
-- [ ] Task: Write tests for vertical layout
+- [x] Task: Implement VerticalLayout struct [f13cc30]
+- [x] Task: Implement top-to-bottom stacking [f13cc30]
+- [x] Task: Handle min/max height constraints [f13cc30]
+- [x] Task: Implement flex space distribution [f13cc30]
+- [x] Task: Write tests for vertical layout [f13cc30]
 
 ### 3.3 Horizontal Layout
 - [ ] Task: Implement HorizontalLayout struct
