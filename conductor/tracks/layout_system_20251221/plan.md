@@ -5,7 +5,7 @@
 - [x] Task: Analyze layouts/grid.py for CSS Grid implementation [f25fd38]
 - [x] Task: Study _arrange.py for the arrangement algorithm [c5d2c4c]
 - [x] Task: Document scroll_view.py and scrollbar.py implementation [63fdbe2]
-- [ ] Task: Map CSS size properties (width, height, min-*, max-*, fr units)
+- [x] Task: Map CSS size properties (width, height, min-*, max-*, fr units) [08bb1f2]
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
 ## Phase 2: Design & Planning
