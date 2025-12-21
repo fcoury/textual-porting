@@ -3,11 +3,11 @@
 ## Phase 1: Analysis & Research
 - [x] Task: Study Python Textual css/styles.py for property definitions [163b1df]
 - [x] Task: Analyze css/_style_properties.py for all property types [fae11e4]
-- [x] Task: Document css/stylesheet.py for cascade and specificity
-- [x] Task: Study css/query.py for selector matching algorithm
-- [x] Task: Analyze _animator.py for animation system
-- [x] Task: Document theme.py for theming approach
-- [~] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
+- [x] Task: Document css/stylesheet.py for cascade and specificity [22bbf6b]
+- [x] Task: Study css/query.py for selector matching algorithm [22bbf6b]
+- [x] Task: Analyze _animator.py for animation system [22bbf6b]
+- [x] Task: Document theme.py for theming approach [22bbf6b]
+- [x] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md) [22bbf6b]
 
 ## Phase 2: Design & Planning
 - [ ] Task: Design property type enum with all TCSS properties
