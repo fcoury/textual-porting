@@ -4,7 +4,7 @@
 - [x] Task: Study Python Textual layouts/vertical.py and horizontal.py [4723bc9]
 - [x] Task: Analyze layouts/grid.py for CSS Grid implementation [f25fd38]
 - [x] Task: Study _arrange.py for the arrangement algorithm [c5d2c4c]
-- [ ] Task: Document scroll_view.py and scrollbar.py implementation
+- [x] Task: Document scroll_view.py and scrollbar.py implementation [63fdbe2]
 - [ ] Task: Map CSS size properties (width, height, min-*, max-*, fr units)
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
