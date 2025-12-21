@@ -11,7 +11,7 @@
 - [x] Task: Integrate `TreeNode` into `WidgetRegistry` to form a graph
 - [x] Task: Conductor - User Manual Verification 'Tree Structure' (Protocol in workflow.md)
 
-## Phase 3: Message Bus
-- [ ] Task: Define `Message` envelope and `Callback` types
-- [ ] Task: Implement `post_message` with bubbling logic (traversing up the tree)
-- [ ] Task: Conductor - User Manual Verification 'Message Bus' (Protocol in workflow.md)
+## Phase 3: Message Bus [checkpoint: e16dd6c]
+- [x] Task: Define `Message` envelope and `Callback` types
+- [x] Task: Implement `post_message` with bubbling logic (traversing up the tree)
+- [x] Task: Conductor - User Manual Verification 'Message Bus' (Protocol in workflow.md)
