@@ -1,0 +1,10 @@
+{
+  "track_id": "advanced_widgets_20251221",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2025-12-21T03:00:00Z",
+  "updated_at": "2025-12-21T03:00:00Z",
+  "description": "Advanced widgets: DataTable, Tree, DirectoryTree, TextArea, Markdown, ListView",
+  "dependencies": ["core_app_lifecycle_20251221", "layout_system_20251221", "tcss_styling_20251221", "basic_widgets_20251221", "container_widgets_20251221"],
+  "tier": 4
+}
