@@ -6,11 +6,11 @@
 - [x] Task: Study _arrange.py for the arrangement algorithm [c5d2c4c]
 - [x] Task: Document scroll_view.py and scrollbar.py implementation [63fdbe2]
 - [x] Task: Map CSS size properties (width, height, min-*, max-*, fr units) [08bb1f2]
-- [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md) [9d55906]
 
 ## Phase 2: Design & Planning
-- [ ] Task: Design Layout trait with arrange() signature
-- [ ] Task: Design constraint solving algorithm for flex distribution
+- [x] Task: Design Layout trait with arrange() signature [9642187]
+- [~] Task: Design constraint solving algorithm for flex distribution
 - [ ] Task: Design ScrollView architecture with virtual content
 - [ ] Task: Design viewport culling strategy
 - [ ] Task: Write technical design document with diagrams
