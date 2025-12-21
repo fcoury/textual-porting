@@ -188,98 +188,102 @@ pub fn render_with_culling(
 }
 ```
 
-## Dirty Region Tracking
+## Dirty Tracking
 
-Beyond culling, we can also track which regions have changed and only re-render those.
+There are two separate concerns for "dirty" tracking:
 
-### Dirty Region Types
+1. **Widget Dirty Tracking** - Which widgets need to re-render their content (widget IDs)
+2. **Terminal Damage Tracking** - Which screen regions changed and need to be sent to terminal (screen-space rects)
+
+These are handled separately because they operate in different coordinate spaces.
+
+### Terminal Damage Tracking (Optional Optimization)
+
+For terminal output optimization, track which screen regions changed:
 
 ```rust
-/// A region that needs re-rendering.
-#[derive(Debug, Clone)]
-pub enum DirtyRegion {
-    /// Everything needs re-rendering.
-    Full,
-    /// Specific rectangles need re-rendering.
-    Partial(Vec<Rect>),
-    /// Nothing needs re-rendering.
-    None,
+/// Tracks damaged screen regions for terminal output optimization.
+/// All rects are in SCREEN SPACE (absolute terminal coordinates).
+#[derive(Debug, Clone, Default)]
+pub struct DamageTracker {
+    /// Damaged screen regions (collected during render).
+    damaged_rects: Vec<Rect>,
+    /// Whether full screen refresh is needed.
+    full_damage: bool,
 }
 
-impl DirtyRegion {
-    /// Mark a rectangle as dirty.
-    pub fn mark_dirty(&mut self, rect: Rect) {
-        match self {
-            DirtyRegion::Full => {}  // Already fully dirty
-            DirtyRegion::Partial(rects) => {
-                // Could merge overlapping rects for efficiency
-                rects.push(rect);
-            }
-            DirtyRegion::None => {
-                *self = DirtyRegion::Partial(vec![rect]);
-            }
+impl DamageTracker {
+    /// Record damage at a screen-space rect (called during render).
+    pub fn record_damage(&mut self, screen_rect: Rect) {
+        if !self.full_damage {
+            self.damaged_rects.push(screen_rect);
         }
     }
 
-    /// Mark everything as dirty.
+    /// Mark full screen as damaged.
     pub fn mark_full(&mut self) {
-        *self = DirtyRegion::Full;
+        self.full_damage = true;
     }
 
-    /// Clear dirty regions (after rendering).
+    /// Get damaged regions for terminal output.
+    pub fn get_damage(&self) -> impl Iterator<Item = &Rect> {
+        self.damaged_rects.iter()
+    }
+
+    /// Clear after terminal output.
     pub fn clear(&mut self) {
-        *self = DirtyRegion::None;
+        self.damaged_rects.clear();
+        self.full_damage = false;
     }
 }
 ```
 
-### Tracking Dirty Widgets
+**Usage:** During `render_with_dirty_tracking`, after calling `widget.render()`, record `damage.record_damage(visible)` where `visible` is already in screen space.
+
+### Widget Dirty Tracking
+
+**IMPORTANT:** Dirty tracking uses widget IDs, not regions. Region-based tracking has coordinate space issues (placement.region is in parent space, but culling uses screen space). Widget ID tracking is simple and correct.
 
 ```rust
 /// Track which widgets need re-rendering.
 #[derive(Debug, Default)]
 pub struct DirtyTracker {
-    /// Widgets that have changed.
+    /// Widgets that have changed (primary mechanism).
     dirty_widgets: HashSet<WidgetId>,
-    /// Regions that need re-rendering.
-    dirty_region: DirtyRegion,
+    /// Whether everything needs re-rendering.
+    full_redraw: bool,
 }
 
 impl DirtyTracker {
     /// Mark a widget as needing re-render.
-    pub fn mark_widget_dirty(&mut self, id: WidgetId, placement_cache: &PlacementCache) {
+    pub fn mark_widget_dirty(&mut self, id: WidgetId) {
         self.dirty_widgets.insert(id);
-        if let Some(placement) = placement_cache.get_placement(id) {
-            self.dirty_region.mark_dirty(placement.region);
-        }
     }
 
     /// Mark all widgets as dirty (e.g., after resize).
     pub fn mark_all_dirty(&mut self) {
-        self.dirty_region.mark_full();
+        self.full_redraw = true;
     }
 
     /// Check if a widget needs re-rendering.
     pub fn is_dirty(&self, id: WidgetId) -> bool {
-        self.dirty_widgets.contains(&id) || matches!(self.dirty_region, DirtyRegion::Full)
+        self.full_redraw || self.dirty_widgets.contains(&id)
     }
 
-    /// Check if a region overlaps any dirty area.
-    pub fn region_is_dirty(&self, region: &Rect) -> bool {
-        match &self.dirty_region {
-            DirtyRegion::Full => true,
-            DirtyRegion::Partial(rects) => rects.iter().any(|r| r.intersects(region)),
-            DirtyRegion::None => false,
-        }
+    /// Check if anything is dirty.
+    pub fn has_dirty(&self) -> bool {
+        self.full_redraw || !self.dirty_widgets.is_empty()
     }
 
     /// Clear after rendering.
     pub fn clear(&mut self) {
         self.dirty_widgets.clear();
-        self.dirty_region.clear();
+        self.full_redraw = false;
     }
 }
 ```
+
+**Note:** For terminal damage tracking (which screen regions changed), compute screen-space bounds during render traversal and collect into a separate damage list. This is orthogonal to widget dirty tracking.
 
 ## Optimized Render Loop
 
@@ -294,7 +298,7 @@ pub fn render_frame(
     buffer: &mut RenderBuffer,
 ) {
     // If nothing is dirty, skip rendering entirely
-    if matches!(dirty.dirty_region, DirtyRegion::None) {
+    if !dirty.has_dirty() {
         return;
     }
 
@@ -342,10 +346,8 @@ pub fn render_with_dirty_tracking(
 
         // Culling check 2: not dirty (only for partial updates)
         // Skip rendering but still process children in case they're dirty
-        let should_render = matches!(dirty.dirty_region, DirtyRegion::Full)
-            || dirty.region_is_dirty(&visible);
-
-        if should_render {
+        // Uses widget ID, not region, to avoid coordinate space issues
+        if dirty.is_dirty(widget_id) {
             let widget = registry.get_widget(widget_id);
             widget.render(visible, buffer);
         }
@@ -396,9 +398,10 @@ pub fn render_with_dirty_tracking(
 ```
 
 **Key differences from basic culling:**
-- Adds `dirty` parameter to check if widget's screen region needs re-rendering
+- Adds `dirty` parameter to check if widget needs re-rendering (by widget ID)
 - Skips `widget.render()` for clean widgets, but still processes children
 - Maintains full screen-space transform and scroll/fixed handling
+- Uses widget IDs (not regions) to avoid coordinate space mismatches
 
 ## Special Cases
 
