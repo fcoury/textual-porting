@@ -1,7 +1,7 @@
 # Plan: TCSS Styling
 
 ## Phase 1: Analysis & Research
-- [ ] Task: Study Python Textual css/styles.py for property definitions
+- [~] Task: Study Python Textual css/styles.py for property definitions
 - [ ] Task: Analyze css/_style_properties.py for all property types
 - [ ] Task: Document css/stylesheet.py for cascade and specificity
 - [ ] Task: Study css/query.py for selector matching algorithm
