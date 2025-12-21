@@ -19,9 +19,9 @@
 ## Phase 3: Implementation
 
 ### 3.1 Layout Trait Foundation
-- [ ] Task: Define Layout trait with arrange() method
-- [ ] Task: Define LayoutResult with widget placements
-- [ ] Task: Implement layout selection based on widget type
+- [x] Task: Define Layout trait with arrange() method [05e0196]
+- [x] Task: Define LayoutResult with widget placements [05e0196]
+- [~] Task: Implement layout selection based on widget type
 - [ ] Task: Write tests for Layout trait
 
 ### 3.2 Vertical Layout
