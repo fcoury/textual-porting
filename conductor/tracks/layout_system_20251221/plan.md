@@ -13,8 +13,8 @@
 - [x] Task: Design constraint solving algorithm for flex distribution [84bacfb]
 - [x] Task: Design ScrollView architecture with virtual content [b9dd104]
 - [x] Task: Design viewport culling strategy [24bf947]
-- [~] Task: Write technical design document with diagrams
-- [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
+- [x] Task: Write technical design document with diagrams [c5a48be]
+- [~] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
 
