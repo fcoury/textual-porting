@@ -6,6 +6,6 @@
 - [x] Task: Conductor - User Manual Verification 'Focus' (Protocol in workflow.md)
 
 ## Phase 2: Mouse Support
-- [ ] Task: Implement Hit-Testing algorithm (Coordinate -> WidgetID)
+- [x] Task: Implement Hit-Testing algorithm (Coordinate -> WidgetID) [6b4de90]
 - [ ] Task: Integrate Mouse Event dispatching in `App::run`
 - [ ] Task: Conductor - User Manual Verification 'Mouse' (Protocol in workflow.md)
