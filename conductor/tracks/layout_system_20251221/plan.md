@@ -47,21 +47,21 @@
 - [x] Task: Write tests for grid layout [a1a7796]
 
 ### 3.5 Container Widgets
-- [ ] Task: Implement Vertical container widget
-- [ ] Task: Implement Horizontal container widget
-- [ ] Task: Implement Grid container widget
-- [ ] Task: Wire containers to use appropriate layouts
-- [ ] Task: Write tests for container widgets
+- [x] Task: Implement Vertical container widget
+- [x] Task: Implement Horizontal container widget
+- [x] Task: Implement Grid container widget
+- [x] Task: Wire containers to use appropriate layouts
+- [x] Task: Write tests for container widgets
 
 ### 3.6 Scroll View
-- [ ] Task: Implement ScrollView widget
-- [ ] Task: Implement virtual content size tracking
-- [ ] Task: Implement scroll offset management
-- [ ] Task: Implement vertical ScrollBar widget
-- [ ] Task: Implement horizontal ScrollBar widget
-- [ ] Task: Implement scroll_to() and scroll_visible() methods
-- [ ] Task: Implement keyboard scrolling (arrows, Page Up/Down)
-- [ ] Task: Write tests for scroll behavior
+- [x] Task: Implement ScrollView widget [0c5a9e5]
+- [x] Task: Implement virtual content size tracking [0c5a9e5]
+- [x] Task: Implement scroll offset management [0c5a9e5]
+- [x] Task: Implement vertical ScrollBar widget [0c5a9e5]
+- [x] Task: Implement horizontal ScrollBar widget [0c5a9e5]
+- [x] Task: Implement scroll_to() and scroll_visible() methods [0c5a9e5]
+- [x] Task: Implement keyboard scrolling (arrows, Page Up/Down) [0c5a9e5]
+- [x] Task: Write tests for scroll behavior [0c5a9e5]
 
 ### 3.7 Viewport Management
 - [ ] Task: Implement visible region calculation
