@@ -283,6 +283,8 @@ impl DirtyTracker {
 
 ## Optimized Render Loop
 
+Dirty tracking integrates with `render_with_culling` by adding an early-exit check. The full screen-space transform and scroll/fixed handling from the main culling algorithm is preserved:
+
 ```rust
 pub fn render_frame(
     root: WidgetId,
@@ -296,56 +298,107 @@ pub fn render_frame(
         return;
     }
 
-    // Calculate visible region
+    // Calculate visible region (screen space)
     let viewport = Rect::new(0, 0, buffer.width, buffer.height);
 
-    // Render with culling
-    render_tree(root, registry, placement_cache, viewport, dirty, buffer);
+    // Render with culling + dirty tracking
+    render_with_dirty_tracking(root, registry, placement_cache, viewport, dirty, buffer);
 
     // Clear dirty tracking
     dirty.clear();
 }
 
-fn render_tree(
-    widget_id: WidgetId,
+/// Render with both culling and dirty region optimization.
+/// This is render_with_culling extended with dirty checks.
+pub fn render_with_dirty_tracking(
+    root: WidgetId,
     registry: &WidgetRegistry,
     placement_cache: &PlacementCache,
-    clip: Rect,
+    clip_region: Rect,
     dirty: &DirtyTracker,
     buffer: &mut RenderBuffer,
 ) {
-    let Some(placement) = placement_cache.get_placement(widget_id) else {
-        return;
-    };
-    let region = placement.region;
+    // Stack holds (widget_id, clip_in_screen_space, transform_to_screen)
+    let mut stack = vec![(root, clip_region, Offset::ZERO)];
 
-    // Culling check 1: off-screen
-    let Some(visible) = region.intersection(&clip) else {
-        return;
-    };
+    while let Some((widget_id, current_clip, screen_offset)) = stack.pop() {
+        let Some(placement) = placement_cache.get_placement(widget_id) else {
+            continue;
+        };
+        let region = placement.region;
 
-    // Culling check 2: not dirty (only for partial updates)
-    if !matches!(dirty.dirty_region, DirtyRegion::Full)
-        && !dirty.region_is_dirty(&visible)
-    {
-        // Widget's visible region hasn't changed, skip
-        // But still need to process children in case they're dirty
-        for child_id in registry.children(widget_id) {
-            render_tree(child_id, registry, placement_cache, visible, dirty, buffer);
+        // Transform widget region to screen space
+        let screen_region = Rect::new(
+            region.x + screen_offset.x,
+            region.y + screen_offset.y,
+            region.width,
+            region.height,
+        );
+
+        // Culling check 1: off-screen
+        let Some(visible) = screen_region.intersection(&current_clip) else {
+            continue;
+        };
+
+        // Culling check 2: not dirty (only for partial updates)
+        // Skip rendering but still process children in case they're dirty
+        let should_render = matches!(dirty.dirty_region, DirtyRegion::Full)
+            || dirty.region_is_dirty(&visible);
+
+        if should_render {
+            let widget = registry.get_widget(widget_id);
+            widget.render(visible, buffer);
         }
-        return;
-    }
 
-    // Render this widget
-    let widget = registry.get_widget(widget_id);
-    widget.render(visible, buffer);
+        // Calculate child clip and transform (same as render_with_culling)
+        let is_scrollable = registry.get_scroll_state(widget_id).is_some();
 
-    // Render children
-    for child_id in registry.children(widget_id) {
-        render_tree(child_id, registry, placement_cache, visible, dirty, buffer);
+        for child_id in registry.children(widget_id) {
+            let child_placement = placement_cache.get_placement(child_id);
+            let is_fixed = child_placement.map(|p| p.fixed).unwrap_or(false);
+
+            let (child_clip, child_offset) = if is_scrollable {
+                let scroll = registry.get_scroll_state(widget_id).unwrap();
+                let viewport_in_screen = Rect::new(
+                    screen_region.x,
+                    screen_region.y,
+                    scroll.viewport_size.width,
+                    scroll.viewport_size.height,
+                );
+                let clipped_viewport = viewport_in_screen.intersection(&current_clip)
+                    .unwrap_or(Rect::ZERO);
+
+                if is_fixed {
+                    let child_screen_offset = Offset {
+                        x: screen_offset.x + region.x,
+                        y: screen_offset.y + region.y,
+                    };
+                    (current_clip.intersection(&screen_region).unwrap_or(Rect::ZERO), child_screen_offset)
+                } else {
+                    let child_screen_offset = Offset {
+                        x: screen_offset.x + region.x,
+                        y: screen_offset.y + region.y,
+                    };
+                    (clipped_viewport, child_screen_offset)
+                }
+            } else {
+                let child_screen_offset = Offset {
+                    x: screen_offset.x + region.x,
+                    y: screen_offset.y + region.y,
+                };
+                (visible, child_screen_offset)
+            };
+
+            stack.push((child_id, child_clip, child_offset));
+        }
     }
 }
 ```
+
+**Key differences from basic culling:**
+- Adds `dirty` parameter to check if widget's screen region needs re-rendering
+- Skips `widget.render()` for clean widgets, but still processes children
+- Maintains full screen-space transform and scroll/fixed handling
 
 ## Special Cases
 
