@@ -260,9 +260,17 @@ impl DirtyTracker {
         self.dirty_widgets.insert(id);
     }
 
+    /// Mark multiple widgets as dirty (e.g., after scroll reveals new widgets).
+    pub fn mark_widgets_dirty(&mut self, ids: impl IntoIterator<Item = WidgetId>) {
+        self.dirty_widgets.extend(ids);
+    }
+
     /// Mark all widgets as dirty (e.g., after resize).
-    pub fn mark_all_dirty(&mut self) {
+    /// IMPORTANT: This populates dirty_widgets with all widget IDs so that
+    /// culled widgets remain dirty after clear_full_redraw().
+    pub fn mark_all_dirty(&mut self, all_widgets: impl IntoIterator<Item = WidgetId>) {
         self.full_redraw = true;
+        self.dirty_widgets.extend(all_widgets);
     }
 
     /// Check if a widget needs re-rendering.
@@ -283,11 +291,14 @@ impl DirtyTracker {
     }
 
     /// Clear full_redraw flag after a complete frame.
+    /// Individual dirty_widgets are preserved for culled widgets.
     pub fn clear_full_redraw(&mut self) {
         self.full_redraw = false;
     }
 }
 ```
+
+**Critical:** When `mark_all_dirty()` is called, ALL widget IDs must be passed so they're added to `dirty_widgets`. This ensures culled widgets remain dirty after `clear_full_redraw()`.
 
 **Note:** For terminal damage tracking (which screen regions changed), compute screen-space bounds during render traversal and collect into a separate damage list. This is orthogonal to widget dirty tracking.
 
@@ -422,12 +433,87 @@ pub fn render_with_dirty_tracking(
 
 ## Special Cases
 
-### 1. Scrolling Optimization
+### 1. Scroll Handling
 
-When only the scroll offset changes (not content), we can use a blit/copy optimization:
+Scroll requires two operations:
+1. **Mark newly visible widgets dirty** - so they render with widget-based tracking
+2. **Record terminal damage** - so the terminal output includes the changed region
+
+```rust
+/// Handle scroll offset change.
+/// CRITICAL: Must mark newly visible widgets dirty for them to render.
+pub fn handle_scroll(
+    scroll_view: WidgetId,
+    old_offset: Offset,
+    new_offset: Offset,
+    registry: &WidgetRegistry,
+    placement_cache: &PlacementCache,
+    dirty: &mut DirtyTracker,
+) {
+    // Calculate the exposed region in content space
+    let scroll = registry.get_scroll_state(scroll_view).unwrap();
+    let viewport = scroll.viewport_size;
+
+    // Find widgets that were off-screen but are now visible
+    let newly_visible = find_widgets_in_exposed_region(
+        scroll_view,
+        old_offset,
+        new_offset,
+        viewport,
+        registry,
+        placement_cache,
+    );
+
+    // Mark them dirty so they render
+    dirty.mark_widgets_dirty(newly_visible);
+}
+
+/// Find widgets in the newly exposed region after scroll.
+fn find_widgets_in_exposed_region(
+    scroll_view: WidgetId,
+    old_offset: Offset,
+    new_offset: Offset,
+    viewport: Size,
+    registry: &WidgetRegistry,
+    placement_cache: &PlacementCache,
+) -> Vec<WidgetId> {
+    // Calculate exposed strip based on scroll direction
+    let exposed = if new_offset.y > old_offset.y {
+        // Scrolled down: bottom strip is newly visible
+        let dy = new_offset.y - old_offset.y;
+        Rect::new(
+            new_offset.x,
+            new_offset.y + viewport.height as i16 - dy,
+            viewport.width,
+            dy as u16,
+        )
+    } else if new_offset.y < old_offset.y {
+        // Scrolled up: top strip is newly visible
+        Rect::new(new_offset.x, new_offset.y, viewport.width, (old_offset.y - new_offset.y) as u16)
+    } else {
+        return vec![];  // No vertical scroll
+    };
+    // Similar for horizontal...
+
+    // Find widgets intersecting the exposed region (in content space)
+    registry.children(scroll_view)
+        .filter(|&id| {
+            placement_cache.get_placement(id)
+                .map(|p| p.region.intersects(&exposed))
+                .unwrap_or(false)
+        })
+        .collect()
+}
+```
+
+### 2. Scroll Blit (Terminal Optimization)
+
+When only the scroll offset changes (not content), we can use a blit/copy optimization for terminal output:
 
 ```rust
 /// Optimize scroll by copying existing buffer content.
+/// NOTE: This only handles terminal damage; handle_scroll must also be
+/// called to mark newly visible widgets dirty.
 pub fn scroll_blit(
     buffer: &mut RenderBuffer,
     damage: &mut DamageTracker,
@@ -458,7 +544,7 @@ pub fn scroll_blit(
 }
 ```
 
-### 2. Widget Virtualization
+### 3. Widget Virtualization
 
 For very large lists, don't even create widgets for off-screen items:
 
