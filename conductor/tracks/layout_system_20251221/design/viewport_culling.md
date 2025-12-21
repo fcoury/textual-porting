@@ -275,9 +275,15 @@ impl DirtyTracker {
         self.full_redraw || !self.dirty_widgets.is_empty()
     }
 
-    /// Clear after rendering.
-    pub fn clear(&mut self) {
-        self.dirty_widgets.clear();
+    /// Clear dirty flag for a specific widget (called after rendering it).
+    /// IMPORTANT: Only clear widgets that were actually rendered, not culled ones.
+    /// Culled widgets remain dirty so they render when scrolled into view.
+    pub fn mark_rendered(&mut self, id: WidgetId) {
+        self.dirty_widgets.remove(&id);
+    }
+
+    /// Clear full_redraw flag after a complete frame.
+    pub fn clear_full_redraw(&mut self) {
         self.full_redraw = false;
     }
 }
@@ -295,6 +301,7 @@ pub fn render_frame(
     registry: &WidgetRegistry,
     placement_cache: &PlacementCache,
     dirty: &mut DirtyTracker,
+    damage: &mut DamageTracker,
     buffer: &mut RenderBuffer,
 ) {
     // If nothing is dirty, skip rendering entirely
@@ -306,10 +313,10 @@ pub fn render_frame(
     let viewport = Rect::new(0, 0, buffer.width, buffer.height);
 
     // Render with culling + dirty tracking
-    render_with_dirty_tracking(root, registry, placement_cache, viewport, dirty, buffer);
+    render_with_dirty_tracking(root, registry, placement_cache, viewport, dirty, damage, buffer);
 
-    // Clear dirty tracking
-    dirty.clear();
+    // Clear full_redraw flag (individual widget flags cleared during render)
+    dirty.clear_full_redraw();
 }
 
 /// Render with both culling and dirty region optimization.
@@ -319,7 +326,8 @@ pub fn render_with_dirty_tracking(
     registry: &WidgetRegistry,
     placement_cache: &PlacementCache,
     clip_region: Rect,
-    dirty: &DirtyTracker,
+    dirty: &mut DirtyTracker,
+    damage: &mut DamageTracker,
     buffer: &mut RenderBuffer,
 ) {
     // Stack holds (widget_id, clip_in_screen_space, transform_to_screen)
@@ -340,6 +348,7 @@ pub fn render_with_dirty_tracking(
         );
 
         // Culling check 1: off-screen
+        // NOTE: Culled widgets stay dirty so they render when scrolled into view
         let Some(visible) = screen_region.intersection(&current_clip) else {
             continue;
         };
@@ -350,6 +359,12 @@ pub fn render_with_dirty_tracking(
         if dirty.is_dirty(widget_id) {
             let widget = registry.get_widget(widget_id);
             widget.render(visible, buffer);
+
+            // Mark widget as rendered (clears its dirty flag)
+            dirty.mark_rendered(widget_id);
+
+            // Record damage in screen space for terminal output optimization
+            damage.record_damage(visible);
         }
 
         // Calculate child clip and transform (same as render_with_culling)
@@ -402,6 +417,8 @@ pub fn render_with_dirty_tracking(
 - Skips `widget.render()` for clean widgets, but still processes children
 - Maintains full screen-space transform and scroll/fixed handling
 - Uses widget IDs (not regions) to avoid coordinate space mismatches
+- Clears dirty flags only for rendered widgets (culled widgets stay dirty)
+- Records screen-space damage for terminal output optimization
 
 ## Special Cases
 
@@ -413,6 +430,7 @@ When only the scroll offset changes (not content), we can use a blit/copy optimi
 /// Optimize scroll by copying existing buffer content.
 pub fn scroll_blit(
     buffer: &mut RenderBuffer,
+    damage: &mut DamageTracker,
     dx: i16,
     dy: i16,
     viewport: Rect,
@@ -423,13 +441,13 @@ pub fn scroll_blit(
         Offset { x: dx, y: dy },
     );
 
-    // Mark newly exposed regions as dirty
+    // Record damage for newly exposed regions (screen-space)
     if dy > 0 {
         // Scrolled down, top strip is new
-        mark_dirty(Rect::new(viewport.x, viewport.y, viewport.width, dy as u16));
+        damage.record_damage(Rect::new(viewport.x, viewport.y, viewport.width, dy as u16));
     } else if dy < 0 {
         // Scrolled up, bottom strip is new
-        mark_dirty(Rect::new(
+        damage.record_damage(Rect::new(
             viewport.x,
             viewport.y + viewport.height as i16 + dy,
             viewport.width,
