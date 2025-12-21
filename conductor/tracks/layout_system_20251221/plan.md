@@ -11,8 +11,8 @@
 ## Phase 2: Design & Planning
 - [x] Task: Design Layout trait with arrange() signature [9642187]
 - [x] Task: Design constraint solving algorithm for flex distribution [84bacfb]
-- [~] Task: Design ScrollView architecture with virtual content
-- [ ] Task: Design viewport culling strategy
+- [x] Task: Design ScrollView architecture with virtual content [b9dd104]
+- [~] Task: Design viewport culling strategy
 - [ ] Task: Write technical design document with diagrams
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
