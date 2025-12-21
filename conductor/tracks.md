@@ -21,3 +21,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## [x] Track: Standard Library - Base Widgets (ARCHIVED)
 *Link: [./conductor/tracks/_archive/std_widgets_20251220/](./conductor/tracks/_archive/std_widgets_20251220/)*
+
+---
+
+## [ ] Track: Textual Port Roadmap
+*Link: [./conductor/tracks/textual_port_roadmap_20251221/](./conductor/tracks/textual_port_roadmap_20251221/)*
