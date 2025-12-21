@@ -1,6 +1,6 @@
 # Plan: Standard Widgets
 
-## Phase 1: Static Widgets [checkpoint: pending]
+## Phase 1: Static Widgets [checkpoint: 11c915a]
 - [x] Task: Implement `Label` widget [c857dc1]
 - [x] Task: Implement `Header` and `Footer` [c857dc1]
 - [x] Task: Conductor - User Manual Verification 'Static Widgets' (Protocol in workflow.md)
