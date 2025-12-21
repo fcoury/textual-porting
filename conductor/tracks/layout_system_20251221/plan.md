@@ -16,7 +16,7 @@
 - [x] Task: Write technical design document with diagrams [c5a48be]
 - [x] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md) [1bd039c]
 
-## Phase 3: Implementation
+## Phase 3: Implementation [checkpoint: 40f8276]
 
 ### 3.1 Layout Trait Foundation
 - [x] Task: Define Layout trait with arrange() method [05e0196]
@@ -64,12 +64,12 @@
 - [x] Task: Write tests for scroll behavior [0c5a9e5]
 
 ### 3.7 Viewport Management
-- [ ] Task: Implement visible region calculation
-- [ ] Task: Implement widget culling for off-screen widgets
-- [ ] Task: Implement dirty region tracking
-- [ ] Task: Write performance tests
+- [x] Task: Implement visible region calculation [d796f35]
+- [x] Task: Implement widget culling for off-screen widgets [d796f35]
+- [x] Task: Implement dirty region tracking [d796f35]
+- [x] Task: Write performance tests [d796f35]
 
-- [ ] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [40f8276]
 
 ## Phase 4: Testing & Verification
 - [ ] Task: Create integration tests with nested layouts
