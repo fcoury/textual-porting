@@ -2,8 +2,8 @@
 
 ## Phase 1: Analysis & Research
 - [x] Task: Study Python Textual css/styles.py for property definitions [163b1df]
-- [~] Task: Analyze css/_style_properties.py for all property types
-- [ ] Task: Document css/stylesheet.py for cascade and specificity
+- [x] Task: Analyze css/_style_properties.py for all property types [fae11e4]
+- [~] Task: Document css/stylesheet.py for cascade and specificity
 - [ ] Task: Study css/query.py for selector matching algorithm
 - [ ] Task: Analyze _animator.py for animation system
 - [ ] Task: Document theme.py for theming approach
