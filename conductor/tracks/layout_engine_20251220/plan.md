@@ -11,6 +11,6 @@
 - [x] Task: Conductor - User Manual Verification 'Layout Solver' (Protocol in workflow.md)
 
 ## Phase 3: Integration
-- [ ] Task: Add `layout()` method to `Widget` trait
+- [x] Task: Add `layout()` method to `Widget` trait [c6dd2ee]
 - [ ] Task: Integrate layout pass into `App::run` loop
 - [ ] Task: Conductor - User Manual Verification 'Layout Integration' (Protocol in workflow.md)
