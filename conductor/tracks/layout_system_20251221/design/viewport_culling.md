@@ -247,10 +247,10 @@ pub struct DirtyTracker {
 
 impl DirtyTracker {
     /// Mark a widget as needing re-render.
-    pub fn mark_widget_dirty(&mut self, id: WidgetId, layout_cache: &LayoutCache) {
+    pub fn mark_widget_dirty(&mut self, id: WidgetId, placement_cache: &PlacementCache) {
         self.dirty_widgets.insert(id);
-        if let Some(region) = layout_cache.get(id) {
-            self.dirty_region.mark_dirty(region);
+        if let Some(placement) = placement_cache.get_placement(id) {
+            self.dirty_region.mark_dirty(placement.region);
         }
     }
 
@@ -287,7 +287,7 @@ impl DirtyTracker {
 pub fn render_frame(
     root: WidgetId,
     registry: &WidgetRegistry,
-    layout_cache: &LayoutCache,
+    placement_cache: &PlacementCache,
     dirty: &mut DirtyTracker,
     buffer: &mut RenderBuffer,
 ) {
@@ -300,7 +300,7 @@ pub fn render_frame(
     let viewport = Rect::new(0, 0, buffer.width, buffer.height);
 
     // Render with culling
-    render_tree(root, registry, layout_cache, viewport, dirty, buffer);
+    render_tree(root, registry, placement_cache, viewport, dirty, buffer);
 
     // Clear dirty tracking
     dirty.clear();
@@ -309,14 +309,15 @@ pub fn render_frame(
 fn render_tree(
     widget_id: WidgetId,
     registry: &WidgetRegistry,
-    layout_cache: &LayoutCache,
+    placement_cache: &PlacementCache,
     clip: Rect,
     dirty: &DirtyTracker,
     buffer: &mut RenderBuffer,
 ) {
-    let Some(region) = layout_cache.get(widget_id) else {
+    let Some(placement) = placement_cache.get_placement(widget_id) else {
         return;
     };
+    let region = placement.region;
 
     // Culling check 1: off-screen
     let Some(visible) = region.intersection(&clip) else {
@@ -330,7 +331,7 @@ fn render_tree(
         // Widget's visible region hasn't changed, skip
         // But still need to process children in case they're dirty
         for child_id in registry.children(widget_id) {
-            render_tree(child_id, registry, layout_cache, visible, dirty, buffer);
+            render_tree(child_id, registry, placement_cache, visible, dirty, buffer);
         }
         return;
     }
@@ -341,7 +342,7 @@ fn render_tree(
 
     // Render children
     for child_id in registry.children(widget_id) {
-        render_tree(child_id, registry, layout_cache, visible, dirty, buffer);
+        render_tree(child_id, registry, placement_cache, visible, dirty, buffer);
     }
 }
 ```
