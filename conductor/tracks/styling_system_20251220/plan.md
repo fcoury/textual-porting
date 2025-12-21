@@ -9,5 +9,5 @@
 ## Phase 2: Cascading Logic
 - [x] Task: Implement `Specificity` calculation for selectors [a45e9e3]
 - [x] Task: Implement `StyleSheet` struct to hold rules [cf025bb]
-- [ ] Task: Implement `compute_style(widget_id, registry, stylesheet)`
+- [x] Task: Implement `compute_style(widget_id, registry, stylesheet)` [8750f19]
 - [ ] Task: Conductor - User Manual Verification 'Cascading' (Protocol in workflow.md)
