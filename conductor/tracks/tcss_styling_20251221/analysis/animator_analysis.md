@@ -74,14 +74,31 @@ class Animator:
         value: Any,
         *,
         final_value: object = ...,
-        duration: float | None = None,
-        speed: float | None = None,
+        duration: float | None = None,  # XOR with speed
+        speed: float | None = None,     # XOR with duration
         easing: EasingFunction | str = DEFAULT_EASING,
         delay: float = 0.0,
         on_complete: CallbackType | None = None,
         level: AnimationLevel = "full",
     ) -> None:
+        # IMPORTANT: Must specify duration OR speed, not both
+        assert (duration is not None) != (speed is not None)
         ...
+```
+
+**Duration vs Speed:**
+- `duration`: Fixed animation time in seconds
+- `speed`: Animation speed; duration computed via `get_distance_to()` for Animatable types or `abs(end - start) / speed` for floats
+
+**Custom Animation Hook:**
+```python
+# Objects can override animation creation via __textual_animation__
+if hasattr(obj, "__textual_animation__"):
+    animation = obj.__textual_animation__(
+        attribute, start_value, end_value, start_time,
+        duration=duration, speed=speed, easing=easing_function,
+        on_complete=on_complete, level=level,
+    )
 ```
 
 ### 4. BoundAnimator

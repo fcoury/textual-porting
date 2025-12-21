@@ -100,12 +100,20 @@ class ThemeProvider(Provider):
     @property
     def commands(self) -> list[tuple[str, Callable[[], None]]]:
         themes = self.app.available_themes
+        # Note: "textual-ansi" is explicitly excluded from command palette
         return [
             (theme.name, partial(set_app_theme, theme.name))
             for theme in themes.values()
+            if theme.name != "textual-ansi"
         ]
 
+    async def discover(self) -> Hits:
+        """Yields all themes for command palette discovery."""
+        for command in self.commands:
+            yield DiscoveryHit(*command)
+
     async def search(self, query: str) -> Hits:
+        """Search themes by name."""
         matcher = self.matcher(query)
         for name, callback in self.commands:
             if (match := matcher.match(name)) > 0:

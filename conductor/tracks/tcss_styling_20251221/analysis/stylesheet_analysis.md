@@ -87,14 +87,16 @@ The `apply()` method implements the full CSS cascade:
 ```python
 Specificity3 = tuple[int, int, int]  # (IDs, Classes, Types)
 Specificity6 = tuple[int, int, int, int, int, int]
-# (is_default, tie_breaker, IDs, Classes, Types, order)
+# (is_default, important, IDs, Classes, Types, tie_breaker)
 ```
 
-The 6-tuple enables:
-- Default rules have lower priority than user rules
-- Tie-breaker for same-origin rules
-- Standard CSS specificity (ID > class > type)
-- Source order as final tie-breaker
+The 6-tuple enables cascade priority:
+1. `is_default`: 0 for user CSS, 1 for DEFAULT_CSS (user CSS wins)
+2. `important`: !important rules get higher priority
+3. `IDs`: ID selector count (#id)
+4. `Classes`: Class/pseudo-class/attribute count (.class, :hover, [attr])
+5. `Types`: Type selector count (Widget, Button)
+6. `tie_breaker`: Source order for equal specificity
 
 ### Pseudo-Class Caching
 

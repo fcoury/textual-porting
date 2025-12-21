@@ -46,6 +46,10 @@ class GenericProperty(Generic[PropertyGetType, PropertySetType]):
 | `FractionalProperty` | `float` | `float \| str` | 0.0-1.0 values (opacity) |
 | `NameProperty` | `str` | `str` | Single name (layer) |
 | `NameListProperty` | `tuple[str, ...]` | `str \| tuple[str]` | Space-separated names (layers) |
+| `ScalarListProperty` | `tuple[Scalar, ...]` | `str \| Iterable` | Grid columns/rows (grid_columns, grid_rows) |
+| `KeylineProperty` | `tuple[str, Color]` | `tuple[str, Color] \| None` | Keyline style for canvas |
+| `DockProperty` | `DockEdge` | `str` | Dock edge ("top", "right", "bottom", "left", "none") |
+| `SplitProperty` | `DockEdge` | `str` | Split edge (same values as DockProperty) |
 
 ### 2. Scalar Properties
 
@@ -143,8 +147,9 @@ class LayoutProperty:
     # Get: Layout | None
     # Set: str | Layout | None
 
-    # Accepts layout name ("vertical", "horizontal", "grid")
+    # Accepts layout name ("vertical", "horizontal", "grid", "stream")
     # or Layout object directly
+    # Uses get_layout() factory from layouts/factory.py
 ```
 
 ### 8. Offset Property
@@ -167,7 +172,9 @@ class StyleFlagsProperty:
     # Set: Style | str | None
 
     # String parsing: "bold italic underline"
-    # Valid flags: bold, italic, underline, strike, reverse, dim, none
+    # Valid flags from VALID_STYLE_FLAGS:
+    #   bold, b, dim, italic, i, underline, u, underline2, uu,
+    #   blink, blink2, reverse, strike, s, overline, o, not, none
 ```
 
 ### 10. Transitions Property

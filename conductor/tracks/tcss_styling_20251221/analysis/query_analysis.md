@@ -24,8 +24,13 @@ class DOMQuery(Generic[QueryType]):
     ):
         self._node = node
         self._nodes: list[QueryType] | None = None  # Lazy evaluation
-        self._filters: list[tuple[SelectorSet, ...]] = []
-        self._excludes: list[tuple[SelectorSet, ...]] = []
+        # Copy filters/excludes from parent query for chaining
+        self._filters: list[tuple[SelectorSet, ...]] = (
+            parent._filters.copy() if parent else []
+        )
+        self._excludes: list[tuple[SelectorSet, ...]] = (
+            parent._excludes.copy() if parent else []
+        )
         self._deep = deep
 ```
 
@@ -129,6 +134,13 @@ From `css/match.py` (imported):
 2. **Selector**: Chain of simple selectors (e.g., `#id .class Type`)
 3. **Simple Selector**: Single selector (`#id`, `.class`, `Type`, `:pseudo`)
 
+**Supported Combinators:**
+- `DESCENDENT` (space): Matches any descendant
+- `CHILD` (`>`): Matches direct child only
+- `SAME`: Chained simple selectors on same element (e.g., `Button.primary`)
+
+**Note:** Sibling combinators (`~`, `+`) are NOT supported in Textual CSS.
+
 Match process:
 ```python
 def match(selector_set: tuple[SelectorSet, ...], node: DOMNode) -> bool:
@@ -141,7 +153,7 @@ def match(selector_set: tuple[SelectorSet, ...], node: DOMNode) -> bool:
 
 def _match_selector(selector: Selector, node: DOMNode) -> bool:
     # Walk up the DOM tree matching each part of the selector
-    # Handle combinators: descendant, child (>), sibling (~, +)
+    # Handle DESCENDENT (walk ancestors) and CHILD (parent only) combinators
 ```
 
 ## Rust Implementation Strategy
