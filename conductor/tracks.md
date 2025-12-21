@@ -29,8 +29,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [x] Track: Core App Lifecycle (Tier 1) (COMPLETE)
-*Link: [./conductor/tracks/core_app_lifecycle_20251221/](./conductor/tracks/core_app_lifecycle_20251221/)*
+## [x] Track: Core App Lifecycle (Tier 1) (ARCHIVED)
+*Link: [./conductor/tracks/_archive/core_app_lifecycle_20251221/](./conductor/tracks/_archive/core_app_lifecycle_20251221/)*
 
 ---
 
