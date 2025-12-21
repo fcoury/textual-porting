@@ -40,14 +40,18 @@ pub enum StyleValue {
     Layout(LayoutKind),
     Dock(DockEdge),
 
-    // Grid
-    GridColumns(Vec<Scalar>),
+    // Grid (integers)
+    GridSizeRows(i32),
+    GridSizeColumns(i32),
+    GridGutterHorizontal(i32),
+    GridGutterVertical(i32),
     GridRows(Vec<Scalar>),
-    GridGutter(Spacing),
+    GridColumns(Vec<Scalar>),
 
-    // Scrollbar
+    // Scrollbar (separate horizontal/vertical integers)
+    ScrollbarSizeHorizontal(i32),
+    ScrollbarSizeVertical(i32),
     ScrollbarGutter(ScrollbarGutter),
-    ScrollbarSize(Scalar),
 
     // Special
     Transition(Transition),
@@ -201,6 +205,8 @@ pub struct Border {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextAlign {
     #[default]
+    Start,   // Logical start (LTR: left, RTL: right)
+    End,     // Logical end (LTR: right, RTL: left)
     Left,
     Center,
     Right,
@@ -436,8 +442,14 @@ pub enum PropertyName {
     BorderRight,
     BorderBottom,
     BorderLeft,
-    BorderTitle,
-    BorderSubtitle,
+    BorderTitleColor,
+    BorderTitleBackground,
+    BorderTitleStyle,
+    BorderTitleAlign,
+    BorderSubtitleColor,
+    BorderSubtitleBackground,
+    BorderSubtitleStyle,
+    BorderSubtitleAlign,
 
     // Outline
     Outline,
@@ -449,12 +461,16 @@ pub enum PropertyName {
     // Colors
     Color,
     Background,
+    BackgroundTint,
     Tint,
+    AutoColor,
 
     // Text
     TextAlign,
     TextStyle,
     TextOpacity,
+    TextWrap,
+    TextOverflow,
 
     // Layout
     Display,
@@ -464,6 +480,11 @@ pub enum PropertyName {
     Dock,
     Layer,
     Layers,
+    Overlay,
+    ConstrainX,
+    ConstrainY,
+    Expand,
+    LinePad,
 
     // Alignment
     AlignHorizontal,
@@ -484,22 +505,26 @@ pub enum PropertyName {
     OffsetX,
     OffsetY,
 
-    // Grid
-    GridColumns,
+    // Grid (integers)
+    GridSizeRows,
+    GridSizeColumns,
+    GridGutterHorizontal,
+    GridGutterVertical,
     GridRows,
-    GridSize,
-    GridGutter,
+    GridColumns,
     ColumnSpan,
     RowSpan,
 
-    // Scrollbar
-    Scrollbar,
+    // Scrollbar (separate horizontal/vertical)
     ScrollbarGutter,
-    ScrollbarSize,
+    ScrollbarSizeHorizontal,
+    ScrollbarSizeVertical,
     ScrollbarCornerColor,
+    // Scrollbar background colors
     ScrollbarBackgroundColor,
     ScrollbarBackgroundColorHover,
     ScrollbarBackgroundColorActive,
+    // Scrollbar thumb colors
     ScrollbarColor,
     ScrollbarColorHover,
     ScrollbarColorActive,
@@ -507,8 +532,17 @@ pub enum PropertyName {
     // Links
     LinkColor,
     LinkBackgroundColor,
+    LinkStyle,
     LinkHoverColor,
     LinkHoverBackgroundColor,
+    LinkHoverStyle,
+    // Auto-links (URLs detected automatically)
+    AutoLinkColor,
+    AutoLinkBackgroundColor,
+    AutoLinkStyle,
+    AutoLinkHoverColor,
+    AutoLinkHoverBackgroundColor,
+    AutoLinkHoverStyle,
 
     // Special
     Hatch,

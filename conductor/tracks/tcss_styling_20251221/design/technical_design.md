@@ -199,11 +199,11 @@ pub struct ThemeRegistry { themes: HashMap<String, Theme>, current: String }
 
 ## Specificity Resolution
 
-CSS cascade priority (6-tuple, higher wins):
+CSS cascade priority (6-tuple, higher wins - use `max()` to select winning rule):
 
 | Position | Field | Description |
 |----------|-------|-------------|
-| 0 | `is_default` | 0 for user CSS, 1 for DEFAULT_CSS (inverted: user wins) |
+| 0 | `is_user_css` | 0 for DEFAULT_CSS (widget defaults), 1 for user CSS (user wins) |
 | 1 | `important` | 1 if !important, 0 otherwise |
 | 2 | `ids` | Count of ID selectors (#id) |
 | 3 | `classes` | Count of class/pseudo-class selectors (.class, :hover) |
@@ -212,9 +212,9 @@ CSS cascade priority (6-tuple, higher wins):
 
 Example:
 ```
-#main .btn:hover  → (0, 0, 1, 2, 0, n)  // 1 ID, 2 classes
-Button.primary    → (0, 0, 0, 1, 1, n)  // 1 class, 1 type
-Button            → (0, 0, 0, 0, 1, n)  // 1 type
+User CSS:    #main .btn:hover  → (1, 0, 1, 2, 0, n)  // user CSS, 1 ID, 2 classes
+User CSS:    Button.primary    → (1, 0, 0, 1, 1, n)  // user CSS, 1 class, 1 type
+DEFAULT_CSS: Button            → (0, 0, 0, 0, 1, n)  // widget default, 1 type
 ```
 
 ## Implementation Plan Corrections

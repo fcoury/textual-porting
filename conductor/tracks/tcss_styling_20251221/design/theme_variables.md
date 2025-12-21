@@ -313,136 +313,69 @@ impl Color {
 
 ## Variable Resolution
 
-### Variable Reference Types
+TCSS uses a simple `$variable` syntax for CSS variables. Variables are defined and resolved
+at the stylesheet level only (no per-node scoping or CSS `var()` function).
 
-```rust
-/// A reference to a CSS variable
-#[derive(Debug, Clone, PartialEq)]
-pub enum VariableRef {
-    /// Simple variable reference: $primary
-    Simple(String),
-    /// Var function with optional fallback: var(--primary, #fff)
-    Var {
-        name: String,
-        fallback: Option<Box<CssValue>>,
-    },
-}
+### Variable Definition Syntax
 
-impl VariableRef {
-    /// Parse variable reference from string
-    pub fn parse(s: &str) -> Option<Self> {
-        let s = s.trim();
+Variables can be defined in CSS using the `$name: value;` syntax:
 
-        // Simple $variable syntax
-        if s.starts_with('$') {
-            let name = s[1..].to_string();
-            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-                return Some(VariableRef::Simple(name));
-            }
-        }
+```css
+$my-color: #ff6b6b;
+$spacing: 2;
 
-        // var(--name) or var(--name, fallback) syntax
-        if s.starts_with("var(") && s.ends_with(')') {
-            let inner = &s[4..s.len()-1].trim();
-            if let Some(comma_pos) = inner.find(',') {
-                let name = inner[..comma_pos].trim();
-                let fallback = inner[comma_pos+1..].trim();
-                if name.starts_with("--") {
-                    return Some(VariableRef::Var {
-                        name: name[2..].to_string(),
-                        fallback: Some(Box::new(CssValue::Raw(fallback.to_string()))),
-                    });
-                }
-            } else if inner.starts_with("--") {
-                return Some(VariableRef::Var {
-                    name: inner[2..].to_string(),
-                    fallback: None,
-                });
-            }
-        }
-
-        None
-    }
+Button {
+    background: $my-color;
+    padding: $spacing;
 }
 ```
 
-### Variable Context
+### Variable Storage
 
 ```rust
-/// Context for resolving CSS variables
-pub struct VariableContext {
-    /// Variables from theme
+/// Stylesheet-level variable storage
+///
+/// Variables are resolved at parse time, not runtime.
+/// There is no per-node scoping - all variables are global to the stylesheet.
+pub struct StylesheetVariables {
+    /// Theme-generated variables ($primary, $secondary, etc.)
     theme_variables: HashMap<String, String>,
-    /// Variables from :root or global scope
-    root_variables: HashMap<String, String>,
-    /// Variables from ancestor scopes (for inheritance)
-    inherited_variables: HashMap<String, String>,
-    /// Local variables (inline styles)
-    local_variables: HashMap<String, String>,
+    /// User-defined variables from $name: value declarations
+    user_variables: HashMap<String, String>,
 }
 
-impl VariableContext {
+impl StylesheetVariables {
     pub fn new() -> Self {
-        VariableContext {
+        StylesheetVariables {
             theme_variables: HashMap::new(),
-            root_variables: HashMap::new(),
-            inherited_variables: HashMap::new(),
-            local_variables: HashMap::new(),
+            user_variables: HashMap::new(),
         }
     }
 
-    /// Create context from theme
+    /// Create with theme variables
     pub fn from_theme(theme: &Theme) -> Result<Self, ColorParseError> {
         let color_system = ColorSystem::from_theme(theme)?;
-        Ok(VariableContext {
+        Ok(StylesheetVariables {
             theme_variables: color_system.generate_variables(),
-            root_variables: HashMap::new(),
-            inherited_variables: HashMap::new(),
-            local_variables: HashMap::new(),
+            user_variables: HashMap::new(),
         })
     }
 
-    /// Resolve a variable reference
-    pub fn resolve(&self, var_ref: &VariableRef) -> Option<String> {
-        match var_ref {
-            VariableRef::Simple(name) | VariableRef::Var { name, fallback: None } => {
-                self.lookup(name)
-            }
-            VariableRef::Var { name, fallback: Some(fb) } => {
-                self.lookup(name).or_else(|| {
-                    // Recursively resolve fallback if it contains variables
-                    Some(fb.resolve(self))
-                })
-            }
-        }
+    /// Define a user variable
+    pub fn define(&mut self, name: String, value: String) {
+        self.user_variables.insert(name, value);
     }
 
-    /// Look up variable by name (checks all scopes)
-    fn lookup(&self, name: &str) -> Option<String> {
-        // Priority: local > inherited > root > theme
-        self.local_variables.get(name)
-            .or_else(|| self.inherited_variables.get(name))
-            .or_else(|| self.root_variables.get(name))
+    /// Look up a variable by name
+    /// User variables take precedence over theme variables
+    pub fn get(&self, name: &str) -> Option<&String> {
+        self.user_variables.get(name)
             .or_else(|| self.theme_variables.get(name))
-            .cloned()
     }
 
-    /// Set a local variable
-    pub fn set_local(&mut self, name: String, value: String) {
-        self.local_variables.insert(name, value);
-    }
-
-    /// Create child context with inherited variables
-    pub fn child(&self) -> VariableContext {
-        let mut inherited = self.inherited_variables.clone();
-        inherited.extend(self.local_variables.clone());
-
-        VariableContext {
-            theme_variables: self.theme_variables.clone(),
-            root_variables: self.root_variables.clone(),
-            inherited_variables: inherited,
-            local_variables: HashMap::new(),
-        }
+    /// Resolve a $variable reference
+    pub fn resolve(&self, name: &str) -> Option<String> {
+        self.get(name).cloned()
     }
 }
 ```
@@ -450,68 +383,64 @@ impl VariableContext {
 ### Value Resolution
 
 ```rust
-impl CssValue {
-    /// Resolve all variables in this value
-    pub fn resolve(&self, ctx: &VariableContext) -> String {
-        match self {
-            CssValue::Raw(s) => {
-                // Check if entire value is a variable
-                if let Some(var_ref) = VariableRef::parse(s) {
-                    if let Some(resolved) = ctx.resolve(&var_ref) {
-                        return resolved;
-                    }
-                }
+/// Resolve all $variable references in a CSS value string
+pub fn resolve_variables(value: &str, vars: &StylesheetVariables) -> String {
+    let mut result = String::new();
+    let mut chars = value.chars().peekable();
 
-                // Check for embedded variables
-                self.resolve_embedded_vars(s, ctx)
+    while let Some(c) = chars.next() {
+        if c == '$' {
+            // Parse variable name (alphanumeric, -, _)
+            let mut name = String::new();
+            while let Some(&c) = chars.peek() {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    name.push(chars.next().unwrap());
+                } else {
+                    break;
+                }
             }
-            CssValue::Resolved(s) => s.clone(),
+
+            if !name.is_empty() {
+                if let Some(resolved) = vars.resolve(&name) {
+                    result.push_str(&resolved);
+                    continue;
+                }
+            }
+
+            // Variable not found, keep original $name
+            result.push('$');
+            result.push_str(&name);
+        } else {
+            result.push(c);
         }
     }
 
-    /// Resolve variables embedded in a string
-    fn resolve_embedded_vars(&self, s: &str, ctx: &VariableContext) -> String {
-        let mut result = String::new();
-        let mut chars = s.chars().peekable();
-
-        while let Some(c) = chars.next() {
-            if c == '$' {
-                // Parse variable name
-                let mut name = String::new();
-                while let Some(&c) = chars.peek() {
-                    if c.is_alphanumeric() || c == '-' || c == '_' {
-                        name.push(chars.next().unwrap());
-                    } else {
-                        break;
-                    }
-                }
-
-                if !name.is_empty() {
-                    let var_ref = VariableRef::Simple(name);
-                    if let Some(resolved) = ctx.resolve(&var_ref) {
-                        result.push_str(&resolved);
-                        continue;
-                    }
-                }
-
-                // Variable not found, keep original
-                result.push('$');
-                result.push_str(&name);
-            } else {
-                result.push(c);
-            }
-        }
-
-        result
-    }
+    result
 }
+```
 
-#[derive(Debug, Clone)]
-pub enum CssValue {
-    /// Raw value that may contain variables
-    Raw(String),
-    /// Fully resolved value
-    Resolved(String),
+### Variable Definition Parsing
+
+```rust
+/// Parse variable definitions from CSS
+/// Returns (variable_name, value) for lines like "$name: value;"
+pub fn parse_variable_definition(line: &str) -> Option<(String, String)> {
+    let line = line.trim();
+
+    if !line.starts_with('$') {
+        return None;
+    }
+
+    let colon_pos = line.find(':')?;
+    let name = line[1..colon_pos].trim().to_string();
+
+    let mut value = line[colon_pos + 1..].trim();
+    // Remove trailing semicolon if present
+    if value.ends_with(';') {
+        value = &value[..value.len() - 1];
+    }
+
+    Some((name, value.trim().to_string()))
 }
 ```
 
@@ -591,42 +520,32 @@ impl Stylesheet {
         let color_system = ColorSystem::from_theme(theme)
             .map_err(|e| ThemeError::InvalidColor(e.to_string()))?;
 
-        let variables = color_system.generate_variables();
-        self.set_variables(variables);
+        let theme_vars = color_system.generate_variables();
+        self.variables = StylesheetVariables {
+            theme_variables: theme_vars,
+            user_variables: self.variables.user_variables.clone(),
+        };
         self.reparse()?;
 
         Ok(())
     }
 
-    /// Set CSS variables
-    pub fn set_variables(&mut self, variables: HashMap<String, String>) {
-        self.variable_context = VariableContext {
-            theme_variables: variables,
-            ..VariableContext::new()
-        };
-    }
-
     /// Reparse all rules with current variables
     pub fn reparse(&mut self) -> Result<(), ParseError> {
         for (location, source) in &self.source {
-            let resolved_css = self.resolve_variables(&source.content);
+            // First pass: extract $name: value definitions
+            for line in source.content.lines() {
+                if let Some((name, value)) = parse_variable_definition(line) {
+                    self.variables.define(name, value);
+                }
+            }
+
+            // Second pass: resolve $var references and parse rules
+            let resolved_css = resolve_variables(&source.content, &self.variables);
             let rules = self.parse_css(&resolved_css, source.scope.clone())?;
             // Update rules...
         }
         Ok(())
-    }
-
-    /// Resolve all variables in CSS text
-    fn resolve_variables(&self, css: &str) -> String {
-        // Simple implementation - replace $var references
-        let mut result = css.to_string();
-
-        for (name, value) in &self.variable_context.theme_variables {
-            let var_pattern = format!("${}", name);
-            result = result.replace(&var_pattern, value);
-        }
-
-        result
     }
 }
 ```

@@ -105,9 +105,6 @@ pub enum PseudoClass {
     Enabled,
     Disabled,
 
-    // Visibility
-    Can(CanFlag),  // :can-focus, :can-maximise, etc.
-
     // Structural (cache-invalidating)
     FirstOfType,
     LastOfType,
@@ -120,23 +117,14 @@ pub enum PseudoClass {
     // Theme
     Dark,
     Light,
+    Ansi,     // Terminal in ANSI-only mode
+    Nocolor,  // No color support
 
     // Inline styles
     Inline,
 
-    // Selection state
-    Selected,
-
     // Custom/unknown pseudo-class (for extensibility)
     Custom(String),
-}
-
-/// Flags for :can-* pseudo-classes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CanFlag {
-    Focus,
-    Maximise,
-    Minimize,
 }
 
 impl PseudoClass {
@@ -149,9 +137,6 @@ impl PseudoClass {
             "hover" => PseudoClass::Hover,
             "enabled" => PseudoClass::Enabled,
             "disabled" => PseudoClass::Disabled,
-            "can-focus" => PseudoClass::Can(CanFlag::Focus),
-            "can-maximise" | "can-maximize" => PseudoClass::Can(CanFlag::Maximise),
-            "can-minimize" | "can-minimise" => PseudoClass::Can(CanFlag::Minimize),
             "first-of-type" => PseudoClass::FirstOfType,
             "last-of-type" => PseudoClass::LastOfType,
             "first-child" => PseudoClass::FirstChild,
@@ -161,8 +146,9 @@ impl PseudoClass {
             "empty" => PseudoClass::Empty,
             "dark" => PseudoClass::Dark,
             "light" => PseudoClass::Light,
+            "ansi" => PseudoClass::Ansi,
+            "nocolor" | "no-color" => PseudoClass::Nocolor,
             "inline" => PseudoClass::Inline,
-            "selected" => PseudoClass::Selected,
             _ => PseudoClass::Custom(name.to_string()),
         }
     }
@@ -185,10 +171,12 @@ impl PseudoClass {
 ```rust
 /// CSS specificity for cascade ordering
 /// Uses 6-tuple for full cascade priority
+///
+/// Ordering: Higher tuple value wins (use max() to select winning rule)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Specificity {
-    /// 0 for user CSS, 1 for DEFAULT_CSS (lower wins)
-    pub is_default: u8,
+    /// 0 for DEFAULT_CSS (widget defaults), 1 for user CSS (user CSS wins)
+    pub is_user_css: u8,
     /// 1 if !important, 0 otherwise (higher wins)
     pub important: u8,
     /// Count of ID selectors
@@ -203,7 +191,7 @@ pub struct Specificity {
 
 impl Specificity {
     pub const ZERO: Specificity = Specificity {
-        is_default: 0,
+        is_user_css: 0,
         important: 0,
         ids: 0,
         classes: 0,
@@ -211,10 +199,20 @@ impl Specificity {
         tie_breaker: 0,
     };
 
+    /// Create specificity for DEFAULT_CSS (widget defaults)
+    pub fn default_css(ids: u16, classes: u16, types: u16, tie_breaker: u32) -> Self {
+        Specificity { is_user_css: 0, important: 0, ids, classes, types, tie_breaker }
+    }
+
+    /// Create specificity for user CSS
+    pub fn user_css(ids: u16, classes: u16, types: u16, tie_breaker: u32) -> Self {
+        Specificity { is_user_css: 1, important: 0, ids, classes, types, tie_breaker }
+    }
+
     /// Create specificity for inline styles (highest priority)
     pub fn inline() -> Self {
         Specificity {
-            is_default: 0,
+            is_user_css: 1,
             important: 0,
             ids: u16::MAX,
             classes: 0,
@@ -223,11 +221,10 @@ impl Specificity {
         }
     }
 
-    /// Convert to comparable tuple for ordering
+    /// Convert to comparable tuple for ordering (higher wins)
     pub fn as_tuple(&self) -> (u8, u8, u16, u16, u16, u32) {
-        // Note: is_default is inverted (0 > 1) for comparison
         (
-            1 - self.is_default,
+            self.is_user_css,  // 1 (user) > 0 (default)
             self.important,
             self.ids,
             self.classes,
