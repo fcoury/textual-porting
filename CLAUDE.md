@@ -1,1 +1,3 @@
 - Check AGENTS.md for general instructions
+- NEVER try to simplify complex tasks, unless explicitly instructed
+- NEVER make design changes. If you find errors or anything else that needs change during the implementation, refer back to the design documents at @conductor/tracks/core_app_lifecycle_20251221/design and propose the changes there.
