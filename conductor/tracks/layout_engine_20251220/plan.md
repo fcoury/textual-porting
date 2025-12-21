@@ -10,7 +10,7 @@
 - [x] Task: Write tests for complex nested docking scenarios [e82ae53]
 - [x] Task: Conductor - User Manual Verification 'Layout Solver' (Protocol in workflow.md)
 
-## Phase 3: Integration
+## Phase 3: Integration [checkpoint: 4a6d947]
 - [x] Task: Add `layout()` method to `Widget` trait [c6dd2ee]
 - [x] Task: Integrate layout pass into `App::run` loop [ac7e8b4]
-- [ ] Task: Conductor - User Manual Verification 'Layout Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Layout Integration' (Protocol in workflow.md)
