@@ -12,5 +12,5 @@
 
 ## Phase 3: Integration
 - [x] Task: Add `layout()` method to `Widget` trait [c6dd2ee]
-- [ ] Task: Integrate layout pass into `App::run` loop
+- [x] Task: Integrate layout pass into `App::run` loop [ac7e8b4]
 - [ ] Task: Conductor - User Manual Verification 'Layout Integration' (Protocol in workflow.md)
