@@ -299,33 +299,12 @@ impl ScrollView {
 }
 ```
 
-### 2. Scrollbar Visibility (Handled by resolve_scrollbar_visibility above)
+### 2. Scrollbar Visibility
 
-The `should_show_*` helpers are replaced by the iterative `resolve_scrollbar_visibility` method which:
+The `resolve_scrollbar_visibility` method handles the cross-axis dependency where showing one scrollbar can trigger the need for the other:
 1. Starts with forced scrollbars only (overflow: scroll)
 2. Calculates viewport → content size → visibility
-3. Repeats until stable (usually 1-2 iterations)
-
-```rust
-// DEPRECATED - replaced by resolve_scrollbar_visibility
-impl ScrollView {
-    fn should_show_vscrollbar(&self, overflow: Overflow, viewport_height: u16, content_height: u16) -> bool {
-        match overflow {
-            Overflow::Hidden => false,
-            Overflow::Scroll => true,
-            Overflow::Auto => content_height > viewport_height,
-        }
-    }
-
-    fn should_show_hscrollbar(&self, overflow: Overflow, viewport_width: u16, content_width: u16) -> bool {
-        match overflow {
-            Overflow::Hidden => false,
-            Overflow::Scroll => true,
-            Overflow::Auto => self.scroll.virtual_size.width > size.width,
-        }
-    }
-}
-```
+3. Repeats until stable (usually 1-2 iterations, max 3)
 
 ## Scroll Operations
 

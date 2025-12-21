@@ -131,34 +131,56 @@ pub fn render_with_culling(
         widget.render(visible, buffer);
 
         // Calculate child clip and transform
-        let (child_clip, child_offset) = if let Some(scroll) = registry.get_scroll_state(widget_id) {
-            // Scrollable container: clip to viewport AND intersect with parent clip
-            let viewport_in_screen = Rect::new(
-                screen_region.x,
-                screen_region.y,
-                scroll.viewport_size.width,
-                scroll.viewport_size.height,
-            );
-            // CRITICAL: Intersect with parent clip to prevent rendering outside parent bounds
-            let clipped_viewport = viewport_in_screen.intersection(&current_clip)
-                .unwrap_or(Rect::ZERO);
-
-            // Children are offset by scroll position (content placed at negative offset)
-            let child_screen_offset = Offset {
-                x: screen_region.x - scroll.offset.x,
-                y: screen_region.y - scroll.offset.y,
-            };
-            (clipped_viewport, child_screen_offset)
-        } else {
-            // Non-scrollable: children inherit current clip, offset by widget position
-            let child_screen_offset = Offset {
-                x: screen_offset.x + region.x,
-                y: screen_offset.y + region.y,
-            };
-            (visible, child_screen_offset)
-        };
+        // NOTE: We need placement metadata to distinguish fixed vs scrolling children
+        let is_scrollable = registry.get_scroll_state(widget_id).is_some();
 
         for child_id in registry.children(widget_id) {
+            // Get placement metadata to check if child is fixed
+            let child_placement = registry.get_placement(child_id);
+            let is_fixed = child_placement.map(|p| p.fixed).unwrap_or(false);
+
+            let (child_clip, child_offset) = if is_scrollable {
+                let scroll = registry.get_scroll_state(widget_id).unwrap();
+
+                // Scrollable container: clip to viewport AND intersect with parent clip
+                let viewport_in_screen = Rect::new(
+                    screen_region.x,
+                    screen_region.y,
+                    scroll.viewport_size.width,
+                    scroll.viewport_size.height,
+                );
+                // CRITICAL: Intersect with parent clip to prevent rendering outside parent bounds
+                let clipped_viewport = viewport_in_screen.intersection(&current_clip)
+                    .unwrap_or(Rect::ZERO);
+
+                if is_fixed {
+                    // Fixed children (scrollbars) don't scroll - use parent's screen offset
+                    // They're positioned relative to the ScrollView, not the content
+                    let child_screen_offset = Offset {
+                        x: screen_offset.x + region.x,
+                        y: screen_offset.y + region.y,
+                    };
+                    // Fixed children clip to full parent region, not just viewport
+                    (current_clip.intersection(&screen_region).unwrap_or(Rect::ZERO), child_screen_offset)
+                } else {
+                    // Scrolling children: scroll offset is ALREADY in their region coordinates
+                    // (content placed at negative offset by ScrollView layout)
+                    // So just use the parent's screen position as the offset base
+                    let child_screen_offset = Offset {
+                        x: screen_offset.x + region.x,
+                        y: screen_offset.y + region.y,
+                    };
+                    (clipped_viewport, child_screen_offset)
+                }
+            } else {
+                // Non-scrollable: children inherit current clip, offset by widget position
+                let child_screen_offset = Offset {
+                    x: screen_offset.x + region.x,
+                    y: screen_offset.y + region.y,
+                };
+                (visible, child_screen_offset)
+            };
+
             stack.push((child_id, child_clip, child_offset));
         }
     }
@@ -432,3 +454,33 @@ Full virtualization is only needed for extreme cases (10,000+ items). Basic cull
 2. **ScrollState**: Defines the visible region for scrollable containers
 3. **RenderBuffer**: Receives only visible content
 4. **DirtyTracker**: Tracks what needs re-rendering
+5. **PlacementCache**: Stores full `WidgetPlacement` (not just `Rect`) for fixed-child handling
+
+### PlacementCache Design
+
+The culling algorithm needs placement metadata (specifically the `fixed` flag) to correctly handle scrollbar children. The registry must store full placements:
+
+```rust
+/// Cache storing layout results with full placement metadata.
+pub struct PlacementCache {
+    /// Widget placements indexed by widget ID.
+    placements: HashMap<WidgetId, WidgetPlacement>,
+}
+
+impl PlacementCache {
+    /// Get a widget's region (backwards compat).
+    pub fn get(&self, id: WidgetId) -> Option<Rect> {
+        self.placements.get(&id).map(|p| p.region)
+    }
+
+    /// Get full placement metadata.
+    pub fn get_placement(&self, id: WidgetId) -> Option<&WidgetPlacement> {
+        self.placements.get(&id)
+    }
+
+    /// Store a placement.
+    pub fn insert(&mut self, placement: WidgetPlacement) {
+        self.placements.insert(placement.widget_id, placement);
+    }
+}
+```

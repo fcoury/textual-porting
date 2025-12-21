@@ -111,6 +111,12 @@ pub trait Layout: Debug + Send + Sync {
         greedy: bool,
     ) -> Vec<WidgetPlacement>;
 
+    /// Get content width for auto-sizing (default: 0).
+    fn get_content_width(&self, context: &LayoutContext, children: &[WidgetId], container: Size) -> u16 { 0 }
+
+    /// Get content height for auto-sizing (default: 0).
+    fn get_content_height(&self, context: &LayoutContext, children: &[WidgetId], container: Size, width: u16) -> u16 { 0 }
+
     fn name(&self) -> &'static str;
 }
 ```
