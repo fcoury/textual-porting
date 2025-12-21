@@ -5,10 +5,10 @@
 - [x] Task: Implement `Rect` logic (intersection, union, containment) [9889ca1]
 - [x] Task: Conductor - User Manual Verification 'Geometry' (Protocol in workflow.md)
 
-## Phase 2: The Layout Solver
+## Phase 2: The Layout Solver [checkpoint: 119152f]
 - [x] Task: Implement the `Dock` layout algorithm [8f2b353]
 - [x] Task: Write tests for complex nested docking scenarios [e82ae53]
-- [ ] Task: Conductor - User Manual Verification 'Layout Solver' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Layout Solver' (Protocol in workflow.md)
 
 ## Phase 3: Integration
 - [ ] Task: Add `layout()` method to `Widget` trait
