@@ -6,10 +6,10 @@
 - [x] Task: Implement `WidgetRegistry` with basic CRUD operations
 - [x] Task: Conductor - User Manual Verification 'Widget Registry' (Protocol in workflow.md)
 
-## Phase 2: The Tree Structure
-- [ ] Task: Implement `TreeNode` struct to manage parent/child ID relationships separate from widget data
-- [ ] Task: Integrate `TreeNode` into `WidgetRegistry` to form a graph
-- [ ] Task: Conductor - User Manual Verification 'Tree Structure' (Protocol in workflow.md)
+## Phase 2: The Tree Structure [checkpoint: e07c297]
+- [x] Task: Implement `TreeNode` struct to manage parent/child ID relationships separate from widget data
+- [x] Task: Integrate `TreeNode` into `WidgetRegistry` to form a graph
+- [x] Task: Conductor - User Manual Verification 'Tree Structure' (Protocol in workflow.md)
 
 ## Phase 3: Message Bus
 - [ ] Task: Define `Message` envelope and `Callback` types
