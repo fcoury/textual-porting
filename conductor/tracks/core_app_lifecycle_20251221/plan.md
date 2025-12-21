@@ -33,9 +33,9 @@
 - [x] Task: Implement ReactiveFlags bitflags
 - [x] Task: Implement WidgetRefreshState with Cell-based flags
 - [x] Task: Implement Reactive trait
-- [ ] Task: Implement #[derive(Reactive)] proc macro (separate crate)
-- [ ] Task: Implement watch_* method pattern in macro
-- [ ] Task: Write tests for reactive updates
+- [x] Task: Implement #[derive(Reactive)] proc macro (separate crate)
+- [x] Task: Implement watch_* method pattern in macro
+- [x] Task: Write tests for reactive updates
 
 ### 3.3 Mount/Unmount System
 - [x] Task: Implement mount() method on widgets
@@ -46,11 +46,11 @@
 - [x] Task: Write tests for mount/unmount lifecycle
 
 ### 3.4 Layout Integration
-- [ ] Task: Define layout trigger points in widget lifecycle
-- [ ] Task: Implement layout invalidation on mount/unmount
-- [ ] Task: Implement layout invalidation on reactive property change
-- [ ] Task: Integrate with Layout System track's compute_layout
-- [ ] Task: Write tests for layout integration
+- [x] Task: Define layout trigger points in widget lifecycle
+- [x] Task: Implement layout invalidation on mount/unmount
+- [x] Task: Implement layout invalidation on reactive property change
+- [x] Task: Integrate with Layout System track's compute_layout
+- [x] Task: Write tests for layout integration
 
 ### 3.5 Screen Stack
 - [x] Task: Implement Screen base type
@@ -65,15 +65,15 @@
 - [x] Task: Implement post_message() for async dispatch
 - [x] Task: Implement message handler lookup
 - [x] Task: Implement event bubbling through widget tree
-- [ ] Task: Add message capture phase
+- [x] Task: Add message capture phase
 - [x] Task: Write tests for message dispatch
 
 ### 3.7 Bindings & Actions
-- [ ] Task: Define Binding struct (key, action, description, priority)
-- [ ] Task: Implement BINDINGS constant pattern
-- [ ] Task: Implement action dispatch via action_* methods
-- [ ] Task: Integrate bindings with Footer widget
-- [ ] Task: Write tests for key binding dispatch
+- [x] Task: Define Binding struct (key, action, description, priority)
+- [x] Task: Implement BINDINGS constant pattern
+- [x] Task: Implement action dispatch via action_* methods
+- [x] Task: Integrate bindings with Footer widget
+- [x] Task: Write tests for key binding dispatch
 
 ### 3.8 DOM Queries
 - [x] Task: Implement query() method returning iterator
@@ -82,11 +82,11 @@
 - [x] Task: Implement type-safe widget casting
 - [x] Task: Write tests for DOM queries
 
-- [ ] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
 
 ## Phase 4: Testing & Verification
-- [ ] Task: Create integration test with full app lifecycle
-- [ ] Task: Create example app demonstrating all features
-- [ ] Task: Run all tests and fix any failures
-- [ ] Task: Manual testing of screen transitions and message flow
+- [x] Task: Create integration test with full app lifecycle
+- [x] Task: Create example app demonstrating all features
+- [x] Task: Run all tests and fix any failures
+- [x] Task: Manual testing of screen transitions and message flow
 - [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
