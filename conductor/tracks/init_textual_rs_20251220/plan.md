@@ -10,8 +10,8 @@
 - [x] Task: Implement terminal guard to manage raw mode and alternate screen
 - [x] Task: Conductor - User Manual Verification 'Terminal Foundation' (Protocol in workflow.md)
 
-## Phase 3: Minimal Application
-- [ ] Task: Write tests for application state and message handling (minimal Elm setup)
-- [ ] Task: Implement the "Hello World" rendering loop with Ratatui
-- [ ] Task: Implement basic input handling to exit on 'q'
-- [ ] Task: Conductor - User Manual Verification 'Minimal Application' (Protocol in workflow.md)
+## Phase 3: Minimal Application [checkpoint: 575755d]
+- [x] Task: Write tests for application state and message handling (minimal Elm setup)
+- [x] Task: Implement the "Hello World" rendering loop with Ratatui
+- [x] Task: Implement basic input handling to exit on 'q'
+- [x] Task: Conductor - User Manual Verification 'Minimal Application' (Protocol in workflow.md)
