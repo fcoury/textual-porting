@@ -1,9 +1,9 @@
 # Plan: Project Initialization
 
-## Phase 1: Environment Setup
-- [ ] Task: Initialize `textual-rs` Cargo crate
-- [ ] Task: Add core dependencies to `Cargo.toml` (`ratatui`, `crossterm`, `tokio`, `thiserror`, `tracing`)
-- [ ] Task: Conductor - User Manual Verification 'Environment Setup' (Protocol in workflow.md)
+## Phase 1: Environment Setup [checkpoint: cecbc26]
+- [x] Task: Initialize `textual-rs` Cargo crate
+- [x] Task: Add core dependencies to `Cargo.toml` (`ratatui`, `crossterm`, `tokio`, `thiserror`, `tracing`)
+- [x] Task: Conductor - User Manual Verification 'Environment Setup' (Protocol in workflow.md)
 
 ## Phase 2: Terminal Foundation
 - [ ] Task: Write tests for terminal guard (RAII-style init/cleanup)
