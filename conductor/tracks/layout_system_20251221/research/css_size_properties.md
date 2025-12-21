@@ -67,12 +67,18 @@ def is_auto(self) -> bool:
 
 @property
 def cells(self) -> int | None:
-    """Get explicit cell count, or None."""
+    """Get explicit cell count, or None.
+    NOTE: Truncates float to int. Python Textual uses int() which floors positive values.
+    For Rust, consider whether to use floor(), round(), or keep as f32.
+    """
     return int(self.value) if self.unit == Unit.CELLS else None
 
 @property
 def fraction(self) -> int | None:
-    """Get fraction value, or None."""
+    """Get fraction value, or None.
+    NOTE: Truncates float to int. In practice, fr values are usually integers (1fr, 2fr).
+    For Rust, consider keeping as f32 to preserve fractional fr values like 1.5fr.
+    """
     return int(self.value) if self.unit == Unit.FRACTION else None
 ```
 
@@ -93,7 +99,13 @@ def parse(cls, token: str, percent_unit: Unit = Unit.WIDTH) -> Scalar:
     """
 ```
 
-Pattern: `^(-?\d+\.?\d*)(fr|%|w|h|vw|vh)?$`
+**NOTE**: The "auto" keyword is handled as a special case before regex matching:
+```python
+if token == "auto":
+    return Scalar(1.0, Unit.AUTO, Unit.AUTO)
+```
+
+Pattern for numeric values: `^(-?\d+\.?\d*)(fr|%|w|h|vw|vh)?$`
 
 ## Resolution
 
@@ -220,6 +232,9 @@ def resolve_fraction_unit(widget_styles, size, viewport, remaining_space, dimens
         if not changed:
             break
 
+    # Guard against division by zero when all widgets are locked
+    if remaining_fraction <= 0:
+        return 0
     return remaining_space / remaining_fraction
 ```
 
@@ -289,6 +304,9 @@ impl Scalar {
         self.unit == Unit::Auto
     }
 
+    /// Resolve scalar to pixel value.
+    /// NOTE: fraction_unit should be pre-calculated from remaining space / total fr.
+    /// Guard against division by zero when calculating fraction_unit upstream.
     pub fn resolve(&self, size: Size, viewport: Size, fraction_unit: i32) -> i32 {
         match self.unit {
             Unit::Cells => self.value as i32,
@@ -301,10 +319,19 @@ impl Scalar {
             }
             Unit::ViewWidth => (self.value * viewport.width as f32 / 100.0) as i32,
             Unit::ViewHeight => (self.value * viewport.height as f32 / 100.0) as i32,
-            Unit::Auto => 0,  // Auto is handled specially
+            Unit::Auto => 0,  // Auto is handled specially in layout
             _ => 0,
         }
     }
+}
+
+/// Calculate the size of 1fr given remaining space and total fr units.
+/// Returns 0 if total_fr is 0 to avoid division by zero.
+pub fn calculate_fraction_unit(remaining_space: i32, total_fr: f32) -> i32 {
+    if total_fr <= 0.0 {
+        return 0;
+    }
+    (remaining_space as f32 / total_fr) as i32
 }
 ```
 

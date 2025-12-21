@@ -74,7 +74,7 @@ else:
 
 #### 3b. Handle Docked Widgets
 
-Docked widgets attach to edges but don't reduce the main content area:
+Docked widgets attach to edges and **do reduce the layout area** for subsequent widgets. The returned `dock_spacing` is used to shrink `dock_region` before laying out regular widgets:
 
 ```python
 layout_widgets, dock_widgets = partition(_get_dock, non_split_widgets)
@@ -83,8 +83,13 @@ if dock_widgets:
         dock_widgets, dock_region, viewport, greedy=not optimal
     )
     placements.extend(_dock_placements)
+    # IMPORTANT: dock_region is shrunk by dock_spacing before layout
     dock_region = dock_region.shrink(dock_spacing)
 ```
+
+**NOTE**: The key difference between dock and split is:
+- **Split**: Physically divides the region, each split widget gets exclusive space
+- **Dock**: Multiple widgets can dock to the same edge (they overlap each other), and the combined spacing reduces the layout area
 
 #### 3c. Handle Layout Widgets
 
@@ -204,8 +209,8 @@ return placements, view_region  # view_region is the remaining space
 
 ### Difference from Dock
 
-- **Dock**: Widgets overlap the content area, spacing is used for scroll calculations
-- **Split**: Widgets divide the region, content gets the remaining space
+- **Split**: Physically divides the region. Each split widget carves out exclusive space, and the remaining `view_region` is passed to subsequent processing.
+- **Dock**: Widgets are positioned at edges and may overlap each other if multiple widgets dock to the same edge. The combined `dock_spacing` reduces the layout area for regular widgets. The `scroll_spacing` from docking is used to calculate the scrollable content area.
 
 ## Layers
 
@@ -220,6 +225,8 @@ for widgets in layers.values():
 ```
 
 This allows overlay widgets to be rendered after base widgets.
+
+**IMPORTANT**: Python dicts maintain insertion order (Python 3.7+), so layers are processed in the order widgets were added. In Rust, `HashMap` does **not** guarantee order. Use `IndexMap` from the `indexmap` crate if layer processing order matters, or collect layer names and sort them before iteration.
 
 ## Rust Implementation Notes
 
@@ -288,11 +295,12 @@ fn partition_by_dock(
     })
 }
 
+// Use IndexMap to preserve insertion order (like Python dict)
 fn build_layers(
     widgets: &[WidgetId],
     registry: &WidgetRegistry,
-) -> HashMap<String, Vec<WidgetId>> {
-    let mut layers: HashMap<String, Vec<WidgetId>> = HashMap::new();
+) -> IndexMap<String, Vec<WidgetId>> {
+    let mut layers: IndexMap<String, Vec<WidgetId>> = IndexMap::new();
     for &widget_id in widgets {
         let layer = registry.get_layer(widget_id);
         layers.entry(layer).or_default().push(widget_id);
