@@ -10,12 +10,12 @@
 - [x] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md) [22bbf6b]
 
 ## Phase 2: Design & Planning
-- [ ] Task: Design property type enum with all TCSS properties
-- [ ] Task: Design selector AST for combinators
-- [ ] Task: Design animation timeline architecture
-- [ ] Task: Design theme variable resolution
-- [ ] Task: Write technical design document
-- [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
+- [x] Task: Design property type enum with all TCSS properties [22415e9]
+- [x] Task: Design selector AST for combinators [22415e9]
+- [x] Task: Design animation timeline architecture [22415e9]
+- [x] Task: Design theme variable resolution [22415e9]
+- [x] Task: Write technical design document [22415e9]
+- [~] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
 
@@ -31,11 +31,11 @@
 ### 3.2 Advanced Selectors
 - [ ] Task: Implement descendant combinator (space)
 - [ ] Task: Implement child combinator (>)
-- [ ] Task: Implement adjacent sibling combinator (+)
-- [ ] Task: Implement general sibling combinator (~)
 - [ ] Task: Implement compound selectors (Type.class#id)
 - [ ] Task: Implement selector specificity calculation
 - [ ] Task: Write tests for selector matching
+
+> **Note:** Sibling combinators (`+`, `~`) are NOT supported in TCSS per Python Textual analysis.
 
 ### 3.3 Animations
 - [ ] Task: Implement @keyframes rule parsing
