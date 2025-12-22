@@ -17,6 +17,15 @@ class ToggleButton(Static, can_focus=True):
 - `value: reactive[bool] = False` - Toggle state
 - `compact: reactive[bool] = False` - Compact mode
 
+### Initial Value Behavior (CRITICAL)
+```python
+def __init__(self, label="", value=False, ...):
+    ...
+    with self.prevent(self.Changed):
+        self.value = value  # Suppresses Changed message on initial assignment
+```
+**Important:** When setting the initial `value` in the constructor, the Changed message is suppressed using `prevent()`. The Rust port must NOT emit Changed when setting the initial value.
+
 ### Constructor
 ```python
 def __init__(
@@ -111,7 +120,12 @@ def watch_value(self, value: bool) -> None:
     else:
         self._slider_position = target
     self.post_message(self.Changed(self, self.value))
+
+def watch__slider_position(self, slider_position: float) -> None:
+    """Toggle -on class based on slider position for CSS styling."""
+    self.set_class(slider_position == 1.0, "-on")
 ```
+**CSS Coupling:** The `-on` class is toggled when `_slider_position` reaches 1.0 (fully on). CSS uses `-on` to style the switch in its "on" state.
 
 ### Rendering
 Uses `ScrollBarRender` with virtual_size=100, window_size=50, position based on _slider_position.
@@ -264,7 +278,7 @@ def vertical(cls, line_style="solid", ...) -> Rule: ...
 ### DEFAULT_CSS
 ```css
 Rule {
-    color: $primary;
+    color: $secondary;
 }
 
 Rule.-horizontal {

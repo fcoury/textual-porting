@@ -3,11 +3,13 @@
 ## Link Widget
 
 ### Overview
-Simple clickable link that opens a URL. Extends Static.
+Simple clickable link that opens a URL. Extends Static with `markup=False` (link text is NOT parsed as markup).
 
 ### Class Definition
 ```python
 class Link(Static, can_focus=True):
+    def __init__(self, text, *, url=None, ...):
+        super().__init__(text, markup=False)  # Disables markup parsing for link text
 ```
 
 ### Reactive Properties
@@ -63,6 +65,25 @@ Navigable list of options extending ScrollView. Used as base for Select dropdown
 class OptionList(ScrollView, can_focus=True):
 ```
 
+### Constructor
+```python
+def __init__(
+    self,
+    *content: OptionListContent,
+    name: str | None = None,
+    id: str | None = None,
+    classes: str | None = None,
+    disabled: bool = False,
+    tooltip: RenderableType | None = None,
+    markup: bool = True,      # Enable markup parsing in option prompts
+    compact: bool = False,    # Compact display mode (toggles -compact class)
+):
+```
+
+### Reactive Properties
+- `highlighted: reactive[int | None]` - Currently highlighted option index
+- `compact: reactive[bool] = False` - Toggles `-compact` CSS class
+
 ### OptionListContent Type
 ```python
 OptionListContent: TypeAlias = "Option | VisualType | None"
@@ -86,9 +107,6 @@ class Option:
         self._divider = False  # Is separator line
 ```
 
-### Reactive Properties
-- `highlighted: reactive[int | None]` - Currently highlighted option index
-
 ### Key Bindings
 ```python
 BINDINGS = [
@@ -104,15 +122,18 @@ BINDINGS = [
 
 ### Messages
 ```python
-class OptionHighlighted(Message):
+class OptionMessage(Message):
+    """Base class for OptionList messages."""
     option_list: OptionList
     option: Option
-    option_index: int
+    option_id: str | None    # The option's ID (if set)
+    option_index: int        # The option's index in the list
 
-class OptionSelected(Message):
-    option_list: OptionList
-    option: Option
-    option_index: int
+class OptionHighlighted(OptionMessage):
+    """Sent when an option is highlighted (cursor moves)."""
+
+class OptionSelected(OptionMessage):
+    """Sent when an option is selected (Enter pressed)."""
 ```
 
 ### Key Methods
