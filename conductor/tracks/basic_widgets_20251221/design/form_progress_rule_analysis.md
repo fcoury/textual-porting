@@ -116,14 +116,16 @@ def __init__(
 def __init__(self, value=False, ...):
     ...
     if value:
-        self._slider_position = 1.0  # Direct assignment, no watcher
+        self._slider_position = 1.0  # Triggers watch__slider_position → sets -on class
         self.set_reactive(Switch.value, value)  # Avoids firing watch_value
 ```
 **Important:** When `value=True` is passed to the constructor:
-1. `_slider_position` is set to 1.0 via direct assignment
-2. `set_reactive(Switch.value, value)` sets the value WITHOUT triggering `watch_value`
+1. `_slider_position = 1.0` triggers `watch__slider_position` which sets the `-on` CSS class
+2. `set_reactive(Switch.value, value)` sets value WITHOUT triggering `watch_value` (no Changed message, no animation)
 
-The Rust port must NOT emit Changed or animate when setting initial value.
+The Rust port must:
+- Set `-on` class when initializing with `value=True`
+- NOT emit Changed or animate when setting initial value
 
 ### Animation
 ```python

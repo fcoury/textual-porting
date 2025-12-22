@@ -80,15 +80,15 @@ def __init__(
 ```
 
 ### Initialization Behavior
-During `__init__`, after adding options, OptionList auto-highlights the first option:
+During `__init__`, after adding options, OptionList auto-highlights the first *enabled* option:
 ```python
 def __init__(self, *content, ...):
     ...
     self.add_options(content)
     if self.option_count:
-        self.action_first()  # Highlights first option during init
+        self.action_first()  # Highlights first ENABLED option during init
 ```
-**Note:** `action_first()` is called in `__init__` (not `on_mount`). `on_mount` only updates line caches.
+**Note:** `action_first()` calls `_find_first_enabled()` to skip disabled options. `on_mount` only updates line caches.
 
 ### Reactive Properties
 - `highlighted: reactive[int | None]` - Currently highlighted option index
@@ -213,6 +213,12 @@ prompt: var[str] = var("Select")                                # Has watcher
 ```
 **Note:** These are `var` (not `reactive`). `value` and `expanded` use `init=False` to prevent watchers firing during initialization.
 
+### Reactive Properties
+```python
+compact: reactive[bool] = reactive(False)  # Toggles -textual-compact CSS class
+```
+**CSS Coupling:** When `compact` changes, the `-textual-compact` class is toggled for styling.
+
 ### Constructor
 ```python
 def __init__(
@@ -235,10 +241,17 @@ def __init__(
 
 ### Messages
 ```python
-@dataclass
 class Changed(Message, Generic[SelectType]):
-    select: Select[SelectType]
-    value: SelectType | NoSelection
+    """NOT a @dataclass - uses explicit __init__."""
+    def __init__(self, select: Select[SelectType], value: SelectType | NoSelection):
+        self.select = select
+        self.value = value
+        super().__init__()
+
+    @property
+    def control(self) -> Select[SelectType]:
+        """Alias for select (common pattern in Textual messages)."""
+        return self.select
 ```
 
 ### Internal Components
