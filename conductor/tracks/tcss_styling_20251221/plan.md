@@ -30,7 +30,7 @@
 
 ### 3.2 Advanced Selectors
 - [x] Task: Implement descendant combinator (space) [8891c71]
-- [ ] Task: Implement child combinator (>)
+- [x] Task: Implement child combinator (>) [344fc74]
 - [ ] Task: Implement compound selectors (Type.class#id)
 - [ ] Task: Implement selector specificity calculation
 - [ ] Task: Write tests for selector matching
