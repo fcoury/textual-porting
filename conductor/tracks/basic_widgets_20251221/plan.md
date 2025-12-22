@@ -23,8 +23,8 @@
 - [x] Task: Design reactive property integration for all widgets [00de357]
 - [x] Task: Design DEFAULT_CSS pattern in Rust [6820188]
 - [x] Task: Design message types matching Python Textual exactly [3b88b76]
-- [~] Task: Design Validator and Suggester traits for Input
-- [ ] Task: Write technical design document
+- [x] Task: Design Validator and Suggester traits for Input [2a796c2]
+- [~] Task: Write technical design document
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
