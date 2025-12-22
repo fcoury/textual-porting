@@ -463,6 +463,31 @@ pub enum Constrain {
     Inside,    // Constrain to stay inside parent
     Inflect,   // Constrain to inflection point
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Position {
+    #[default]
+    Relative,  // Positioned relative to normal flow
+    Absolute,  // Positioned absolutely within container
+}
+
+/// Two-axis offset (x, y) for the offset property
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ScalarOffset {
+    pub x: Scalar,
+    pub y: Scalar,
+}
+
+impl ScalarOffset {
+    pub const ZERO: ScalarOffset = ScalarOffset {
+        x: Scalar::ZERO,
+        y: Scalar::ZERO,
+    };
+
+    pub fn new(x: Scalar, y: Scalar) -> Self {
+        ScalarOffset { x, y }
+    }
+}
 ```
 
 ## Property Name Registry
@@ -535,6 +560,7 @@ pub enum PropertyName {
     Opacity,
     Layout,
     Dock,
+    Split,      // Split edge property
     Layer,
     Layers,
     Overlay,
@@ -542,6 +568,7 @@ pub enum PropertyName {
     ConstrainY,
     Expand,
     LinePad,
+    Position,   // Position enum (relative/absolute)
 
     // Alignment
     AlignHorizontal,
@@ -721,9 +748,15 @@ impl PropertyName {
             // Scalar lists (grid tracks)
             PropertyName::GridRows | PropertyName::GridColumns => PropertyValueType::ScalarList,
 
-            // Offset
-            PropertyName::Offset | PropertyName::OffsetX |
-            PropertyName::OffsetY => PropertyValueType::Scalar,
+            // Offset - 2-axis uses ScalarOffset, individual axes use Scalar
+            PropertyName::Offset => PropertyValueType::ScalarOffset,
+            PropertyName::OffsetX | PropertyName::OffsetY => PropertyValueType::Scalar,
+
+            // Position (relative/absolute)
+            PropertyName::Position => PropertyValueType::Position,
+
+            // Split (dock edge)
+            PropertyName::Split => PropertyValueType::Dock,
 
             // Box sizing
             PropertyName::BoxSizing => PropertyValueType::BoxSizing,
@@ -736,6 +769,7 @@ impl PropertyName {
     }
 
     /// Does this property trigger layout recalculation?
+    /// Based on Python Textual's layout=True property definitions.
     pub fn triggers_layout(&self) -> bool {
         matches!(self,
             // Dimensions
@@ -754,8 +788,9 @@ impl PropertyName {
             // Display/positioning
             PropertyName::Display | PropertyName::Dock |
             PropertyName::Layout | PropertyName::BoxSizing |
-            PropertyName::Overlay | PropertyName::Expand |
-            PropertyName::ConstrainX | PropertyName::ConstrainY |
+            PropertyName::Overlay |
+            // Text layout
+            PropertyName::LinePad |
             // Grid
             PropertyName::GridColumns | PropertyName::GridRows |
             PropertyName::GridSizeRows | PropertyName::GridSizeColumns |
@@ -766,23 +801,46 @@ impl PropertyName {
             PropertyName::ScrollbarSizeHorizontal | PropertyName::ScrollbarSizeVertical |
             PropertyName::ScrollbarGutter
         )
+        // Note: Expand and Constrain do NOT trigger layout in Python Textual
     }
 
     /// Is this property animatable?
+    /// Based on Python Textual's ANIMATABLE set in _style_properties.py.
     pub fn is_animatable(&self) -> bool {
         matches!(self,
+            // Dimensions (all scalars)
             PropertyName::Width | PropertyName::Height |
-            PropertyName::Color | PropertyName::Background |
-            PropertyName::BackgroundTint | PropertyName::Tint |
-            PropertyName::Opacity | PropertyName::TextOpacity |
-            PropertyName::Offset | PropertyName::OffsetX | PropertyName::OffsetY |
+            PropertyName::MinWidth | PropertyName::MinHeight |
+            PropertyName::MaxWidth | PropertyName::MaxHeight |
+            // Box model (spacing)
             PropertyName::Margin | PropertyName::MarginTop |
             PropertyName::MarginRight | PropertyName::MarginBottom |
             PropertyName::MarginLeft |
             PropertyName::Padding | PropertyName::PaddingTop |
             PropertyName::PaddingRight | PropertyName::PaddingBottom |
             PropertyName::PaddingLeft |
-            PropertyName::ScrollbarColor | PropertyName::ScrollbarBackgroundColor
+            // Offset
+            PropertyName::Offset | PropertyName::OffsetX | PropertyName::OffsetY |
+            // Colors
+            PropertyName::Color | PropertyName::Background |
+            PropertyName::BackgroundTint | PropertyName::Tint |
+            PropertyName::AutoColor |
+            // Border colors
+            PropertyName::BorderTitleColor | PropertyName::BorderTitleBackground |
+            PropertyName::BorderSubtitleColor | PropertyName::BorderSubtitleBackground |
+            // Scrollbar colors (all variants)
+            PropertyName::ScrollbarColor | PropertyName::ScrollbarColorHover |
+            PropertyName::ScrollbarColorActive |
+            PropertyName::ScrollbarBackgroundColor | PropertyName::ScrollbarBackgroundColorHover |
+            PropertyName::ScrollbarBackgroundColorActive |
+            PropertyName::ScrollbarCornerColor |
+            // Link colors
+            PropertyName::LinkColor | PropertyName::LinkBackgroundColor |
+            PropertyName::LinkHoverColor | PropertyName::LinkHoverBackgroundColor |
+            PropertyName::AutoLinkColor | PropertyName::AutoLinkBackgroundColor |
+            PropertyName::AutoLinkHoverColor | PropertyName::AutoLinkHoverBackgroundColor |
+            // Opacity
+            PropertyName::Opacity | PropertyName::TextOpacity
         )
     }
 }
@@ -790,6 +848,7 @@ impl PropertyName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertyValueType {
     Scalar,
+    ScalarOffset,  // 2-axis offset (x, y)
     Spacing,
     Color,
     Display,
@@ -804,6 +863,7 @@ pub enum PropertyValueType {
     Expand,
     Overlay,
     Constrain,
+    Position,  // relative/absolute
     Border,
     BorderEdge,
     AlignHorizontal,

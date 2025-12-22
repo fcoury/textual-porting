@@ -51,9 +51,9 @@ impl Default for Theme {
             error: None,
             success: None,
             accent: None,
-            foreground: None,
-            background: None,
-            surface: None,
+            foreground: None,      // Defaults to #e0e0e0 (dark) or #1e1e1e (light) in ColorSystem
+            background: None,      // Defaults to #121212 (dark) or #ffffff (light) in ColorSystem
+            surface: None,         // Defaults to #1e1e1e (dark) or #f5f5f5 (light) in ColorSystem
             panel: None,
             boost: None,
             dark: true,
@@ -166,6 +166,7 @@ pub struct ColorSystem {
 
 impl ColorSystem {
     /// Create from theme
+    /// Defaults match Python's DEFAULT_COLORS in theme.py
     pub fn from_theme(theme: &Theme) -> Result<Self, ColorParseError> {
         Ok(ColorSystem {
             primary: Color::parse(&theme.primary)?,
@@ -178,17 +179,17 @@ impl ColorSystem {
                 .map(|s| Color::parse(s))
                 .transpose()?
                 .unwrap_or(if theme.dark {
-                    Color::parse("#e0e0e0")?
+                    Color::parse("#e0e0e0")?   // DEFAULT_COLORS["dark"]["foreground"]
                 } else {
-                    Color::parse("#1e1e1e")?
+                    Color::parse("#1e1e1e")?   // DEFAULT_COLORS["light"]["foreground"]
                 }),
             background: theme.background.as_ref()
                 .map(|s| Color::parse(s))
                 .transpose()?
                 .unwrap_or(if theme.dark {
-                    Color::parse("#1e1e1e")?
+                    Color::parse("#121212")?   // DEFAULT_COLORS["dark"]["background"]
                 } else {
-                    Color::parse("#f5f5f5")?
+                    Color::parse("#ffffff")?   // DEFAULT_COLORS["light"]["background"]
                 }),
             surface: theme.surface.as_ref().map(|s| Color::parse(s)).transpose()?,
             panel: theme.panel.as_ref().map(|s| Color::parse(s)).transpose()?,
@@ -251,13 +252,32 @@ impl ColorSystem {
         vars.insert("text-muted".into(), self.foreground.with_alpha(0.6).to_css());
         vars.insert("text-disabled".into(), self.foreground.with_alpha(0.4).to_css());
 
-        // Contrast text for colored backgrounds (uses Textual's contrast_text logic)
+        // Contrast text for colored backgrounds (uses Textual's get_contrast_text)
+        // Python uses a tinted variant based on background, not pure black/white
         let text_on_primary = self.contrast_text(&self.primary);
         vars.insert("text-primary".into(), text_on_primary.to_css());
 
         if let Some(ref secondary) = self.secondary {
             let text_on_secondary = self.contrast_text(secondary);
             vars.insert("text-secondary".into(), text_on_secondary.to_css());
+        }
+
+        // Contrast text for warning/error/success/accent backgrounds
+        if let Some(ref warning) = self.warning {
+            let text_on_warning = self.contrast_text(warning);
+            vars.insert("text-warning".into(), text_on_warning.to_css());
+        }
+        if let Some(ref error) = self.error {
+            let text_on_error = self.contrast_text(error);
+            vars.insert("text-error".into(), text_on_error.to_css());
+        }
+        if let Some(ref success) = self.success {
+            let text_on_success = self.contrast_text(success);
+            vars.insert("text-success".into(), text_on_success.to_css());
+        }
+        if let Some(ref accent) = self.accent {
+            let text_on_accent = self.contrast_text(accent);
+            vars.insert("text-accent".into(), text_on_accent.to_css());
         }
 
         // Add custom variables
@@ -297,32 +317,38 @@ impl ColorSystem {
     }
 
     /// Get contrasting text color for a background (matches Python's get_contrast_text)
+    /// Uses a tinted variant based on the color being contrasted against,
+    /// not pure black/white.
     fn contrast_text(&self, background: &Color) -> Color {
         // Calculate relative luminance
         let luminance = background.luminance();
 
-        // Use WCAG contrast threshold
+        // Use WCAG contrast threshold (0.179 is the threshold for 4.5:1 contrast)
         if luminance > 0.179 {
-            // Light background: use dark text
-            Color::parse("#000000").unwrap().with_alpha(self.text_alpha)
+            // Light background: use dark text tinted toward the background color
+            // This creates a more cohesive look than pure black
+            let base = Color::parse("#000000").unwrap();
+            base.blend(background, 0.15).with_alpha(self.text_alpha)
         } else {
-            // Dark background: use light text
-            Color::parse("#ffffff").unwrap().with_alpha(self.text_alpha)
+            // Dark background: use light text tinted toward the background color
+            // This creates a more cohesive look than pure white
+            let base = Color::parse("#ffffff").unwrap();
+            base.blend(background, 0.15).with_alpha(self.text_alpha)
         }
     }
 }
 
-/// Default dark theme background (matches Python DEFAULT_DARK_BACKGROUND)
-pub static DEFAULT_DARK_BACKGROUND: Color = Color { r: 30, g: 30, b: 30, a: 1.0 };  // #1e1e1e
+/// Default dark theme background (matches Python DEFAULT_COLORS["dark"]["background"])
+pub static DEFAULT_DARK_BACKGROUND: Color = Color { r: 18, g: 18, b: 18, a: 1.0 };  // #121212
 
-/// Default dark theme surface (matches Python DEFAULT_DARK_SURFACE)
-pub static DEFAULT_DARK_SURFACE: Color = Color { r: 36, g: 36, b: 36, a: 1.0 };  // #242424
+/// Default dark theme surface (matches Python DEFAULT_COLORS["dark"]["surface"])
+pub static DEFAULT_DARK_SURFACE: Color = Color { r: 30, g: 30, b: 30, a: 1.0 };  // #1e1e1e
 
-/// Default light theme background
-pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 245, g: 245, b: 245, a: 1.0 };  // #f5f5f5
+/// Default light theme background (matches Python DEFAULT_COLORS["light"]["background"])
+pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 255, g: 255, b: 255, a: 1.0 };  // #ffffff
 
-/// Default light theme surface
-pub static DEFAULT_LIGHT_SURFACE: Color = Color { r: 255, g: 255, b: 255, a: 1.0 };  // #ffffff
+/// Default light theme surface (matches Python DEFAULT_COLORS["light"]["surface"])
+pub static DEFAULT_LIGHT_SURFACE: Color = Color { r: 245, g: 245, b: 245, a: 1.0 };  // #f5f5f5
 
 impl Color {
     /// Calculate relative luminance (for WCAG contrast calculations)
