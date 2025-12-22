@@ -38,8 +38,8 @@
 > **Note:** Sibling combinators (`+`, `~`) are NOT supported in TCSS per Python Textual analysis.
 
 ### 3.3 Animations
-- [ ] Task: Implement @keyframes rule parsing
-- [ ] Task: Implement animation property parsing
+- [x] Task: Implement @keyframes rule parsing [6b704ba]
+- [~] Task: Implement animation property parsing
 - [ ] Task: Implement animation timeline
 - [ ] Task: Implement easing functions (linear, ease-in, ease-out, ease-in-out)
 - [ ] Task: Implement cubic-bezier easing
