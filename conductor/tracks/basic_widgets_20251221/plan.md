@@ -1,7 +1,7 @@
 # Plan: Basic Widgets
 
 ## Phase 1: Analysis & Research
-- [ ] Task: Study Python Textual _static.py as base for Label
+- [x] Task: Study Python Textual _static.py as base for Label [cc15181]
 - [ ] Task: Analyze _button.py for variants, action support, DEFAULT_CSS
 - [ ] Task: Study _input.py for ScrollView inheritance, selection, validation, suggester
 - [ ] Task: Document _header.py clock, icon, screen title integration
