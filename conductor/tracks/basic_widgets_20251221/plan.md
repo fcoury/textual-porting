@@ -19,8 +19,8 @@
 - [x] Task: Conductor - User Manual Verification 'Analysis Complete' (Approved with residual risk note)
 
 ## Phase 2: Design & Planning
-- [ ] Task: Design Static base widget with markup support
-- [ ] Task: Design reactive property integration for all widgets
+- [x] Task: Design Static base widget with markup support [715bdde]
+- [~] Task: Design reactive property integration for all widgets
 - [ ] Task: Design DEFAULT_CSS pattern in Rust
 - [ ] Task: Design message types matching Python Textual exactly
 - [ ] Task: Design Validator and Suggester traits for Input
