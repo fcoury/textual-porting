@@ -73,14 +73,17 @@
 ## Phase 4: Testing & Verification [checkpoint: 0bb0f3f]
 - [x] Task: Create comprehensive property parsing tests [569312c]
 - [x] Task: Create selector matching test suite [569312c]
-- [x] Task: Create animation example app [569312c]
-- [x] Task: Create theme switching example [569312c]
+- [x] Task: Create animation example app [710bcbf]
+- [x] Task: Create theme switching example [710bcbf]
+- [x] Task: Create demo.tcss comprehensive stylesheet [710bcbf]
 - [x] Task: Run all tests and fix failures [569312c]
 - [x] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md) [0bb0f3f]
 
-> **Note:** Phase 4 testing tasks were already completed during Phase 3 implementation.
-> Total tests: 969 (508 style-related tests covering property parsing, selectors,
-> animations, transitions, theming, and hot reloading).
+> **Note:** Example apps added in [710bcbf]:
+> - animation_demo.rs: Animator API with easing functions, @keyframes parsing
+> - theme_demo.rs: ThemeRegistry with built-in and custom themes
+> - demo.tcss: Comprehensive TCSS stylesheet showcasing all features
+> Total tests: 986 passed
 
 ## Phase 5: Bug Fixes for Python Parity [d374d5e]
 
