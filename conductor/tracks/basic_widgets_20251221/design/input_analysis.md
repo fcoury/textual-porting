@@ -21,7 +21,7 @@ class Input(ScrollView):  # NOTE: Extends ScrollView!
 ## Non-Reactive Properties (var)
 - `restrict: str | None = None` - Regex pattern to restrict input
 - `type: InputType` - Input type ("text", "integer", "number")
-- `max_length: int | None = None` - Maximum character length
+- `max_length: int = 0` - Maximum character length (**0 = no maximum**, treated as falsy)
 - `valid_empty: bool = False` - Allow empty values to pass validation
 
 ## Selection Type
@@ -49,6 +49,29 @@ _RESTRICT_TYPES = {
     "text": None,
 }
 ```
+
+## Auto-Validator Behavior (CRITICAL)
+When `type` is set to "integer" or "number" and **no validators are provided**, Input automatically adds the corresponding validator:
+```python
+if not self.validators:
+    if self.type == "integer":
+        self.validators.append(Integer())  # Auto-add Integer validator
+    elif self.type == "number":
+        self.validators.append(Number())   # Auto-add Number validator
+```
+
+## Validation Triggers (validate_on)
+```python
+InputValidationOn = Literal["blur", "changed", "submitted"]
+
+# DEFAULT: If validate_on=None, ALL triggers are enabled
+validate_on: set[str] = (
+    (_POSSIBLE_VALIDATE_ON_VALUES & set(validate_on))
+    if validate_on is not None
+    else _POSSIBLE_VALIDATE_ON_VALUES  # {"blur", "changed", "submitted"}
+)
+```
+**Important:** By default, validation runs on blur, on every change, AND on submit.
 
 ## Constructor Parameters
 ```python

@@ -63,6 +63,14 @@ Navigable list of options extending ScrollView. Used as base for Select dropdown
 class OptionList(ScrollView, can_focus=True):
 ```
 
+### OptionListContent Type
+```python
+OptionListContent: TypeAlias = "Option | VisualType | None"
+# - Option: A selectable option
+# - VisualType: Any Rich renderable (auto-wrapped as Option)
+# - None: Creates a separator line (divider)
+```
+
 ### Option Class
 ```python
 class Option:
@@ -105,6 +113,36 @@ class OptionSelected(Message):
     option_list: OptionList
     option: Option
     option_index: int
+```
+
+### Key Methods
+```python
+def add_option(self, item: OptionListContent = None) -> Self:
+    """Add option. If item is None, adds a separator line."""
+
+def add_options(self, items: Iterable[OptionListContent]) -> Self:
+    """Add multiple options. None values become separators."""
+
+def get_option(self, option_id: str) -> Option:
+    """Get option by ID. Raises OptionDoesNotExist if not found."""
+
+def get_option_at_index(self, index: int) -> Option:
+    """Get option at index. Raises OptionDoesNotExist if invalid."""
+
+def remove_option(self, option_id: str) -> Self:
+    """Remove option by ID. Raises OptionDoesNotExist if not found."""
+
+def remove_option_at_index(self, index: int) -> Self:
+    """Remove option at index. Raises OptionDoesNotExist if invalid."""
+```
+
+### Errors
+```python
+class DuplicateID(Exception):
+    """Raised when adding an option with an ID that already exists."""
+
+class OptionDoesNotExist(Exception):
+    """Raised when referencing an option by ID or index that doesn't exist."""
 ```
 
 ### Component Classes
@@ -179,18 +217,70 @@ SelectOverlay supports typing to jump to matching options:
 ## SelectionList Widget
 
 ### Overview
-Multi-select list where options can be individually toggled.
+Multi-select list where options can be individually toggled. Extends OptionList with checkbox indicators.
 
-### Key Features
-- Options have checkboxes
-- Multiple selection allowed
-- `selected` property returns list of selected values
-
-### Messages
+### Selection Type
 ```python
-class SelectedChanged(Message):
+class Selection(Generic[SelectionType], Option):
+    def __init__(
+        self,
+        prompt: ContentText,
+        value: SelectionType,
+        initial_state: bool = False,  # Initially selected?
+        id: str | None = None,
+        disabled: bool = False
+    ):
+```
+
+### Component Classes
+- `selection-list--button` - Default button style
+- `selection-list--button-selected` - Selected button
+- `selection-list--button-highlighted` - Highlighted button
+- `selection-list--button-selected-highlighted` - Both selected and highlighted
+
+### Bindings
+```python
+BINDINGS = [Binding("space", "select", "Toggle option", show=False)]
+```
+
+### Messages (ALL THREE)
+
+#### SelectionHighlighted
+```python
+class SelectionHighlighted(SelectionMessage[MessageSelectionType]):
+    """Message sent when a selection is highlighted (cursor moves)."""
     selection_list: SelectionList
-    # Contains newly selected/deselected items
+    selection: Selection
+    selection_index: int
+```
+
+#### SelectionToggled
+```python
+class SelectionToggled(SelectionMessage[MessageSelectionType]):
+    """Message sent when a selection is EXPLICITLY toggled.
+
+    Only sent for:
+    - User interaction (space key, click)
+    - toggle() or toggle_all() method calls
+
+    NOT sent for programmatic select()/deselect() calls.
+    A message is sent for EACH option toggled (even in bulk toggle_all).
+    """
+    selection_list: SelectionList
+    selection: Selection
+    selection_index: int
+```
+
+#### SelectedChanged
+```python
+@dataclass
+class SelectedChanged(Generic[MessageSelectionType], Message):
+    """Message sent when the collection of selected values changes.
+
+    Sent for ALL changes (user interaction AND programmatic API calls).
+    For bulk operations (select_all, deselect_all), only ONE message is sent.
+    """
+    selection_list: SelectionList
 ```
 
 ---

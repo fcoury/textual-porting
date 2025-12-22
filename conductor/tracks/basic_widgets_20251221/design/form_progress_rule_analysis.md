@@ -232,6 +232,20 @@ _HORIZONTAL_LINE_CHARS = {
     "ascii": "-", "blank": " ", "dashed": "╍", "double": "═",
     "heavy": "━", "hidden": " ", "none": " ", "solid": "─", "thick": "█"
 }
+
+_VERTICAL_LINE_CHARS = {
+    "ascii": "|", "blank": " ", "dashed": "╏", "double": "║",
+    "heavy": "┃", "hidden": " ", "none": " ", "solid": "│", "thick": "█"
+}
+```
+
+### Errors
+```python
+class InvalidRuleOrientation(Exception):
+    """Raised when an invalid orientation is set."""
+
+class InvalidLineStyle(Exception):
+    """Raised when an invalid line style is set."""
 ```
 
 ### Factory Methods
@@ -246,6 +260,27 @@ def vertical(cls, line_style="solid", ...) -> Rule: ...
 ### CSS Classes
 - `-horizontal` - Added when horizontal
 - `-vertical` - Added when vertical
+
+### DEFAULT_CSS
+```css
+Rule {
+    color: $primary;
+}
+
+Rule.-horizontal {
+    height: 1;
+    margin: 1 0;        /* Vertical margin for visual separation */
+    width: 1fr;         /* Expand to fill horizontal space */
+}
+
+Rule.-vertical {
+    width: 1;
+    margin: 0 2;        /* Horizontal margin for visual separation */
+    height: 1fr;        /* Expand to fill vertical space */
+}
+```
+
+**Note:** Rule uses `expand=True` by default, allowing it to stretch to fill available space in its orientation.
 
 ---
 
@@ -305,6 +340,11 @@ pub enum LineStyle { Ascii, Blank, Dashed, Double, Heavy, Hidden, None, Solid, T
 pub struct Rule {
     orientation: RuleOrientation,
     line_style: LineStyle,
+}
+
+impl LineStyle {
+    pub fn horizontal_char(&self) -> char { /* lookup in HORIZONTAL map */ }
+    pub fn vertical_char(&self) -> char { /* lookup in VERTICAL map */ }
 }
 ```
 
