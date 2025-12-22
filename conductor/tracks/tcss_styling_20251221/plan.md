@@ -81,3 +81,19 @@
 > **Note:** Phase 4 testing tasks were already completed during Phase 3 implementation.
 > Total tests: 969 (508 style-related tests covering property parsing, selectors,
 > animations, transitions, theming, and hot reloading).
+
+## Phase 5: Bug Fixes for Python Parity [d374d5e]
+
+### 5.1 High Priority Fixes (Completed)
+- [x] Task: Fix CSS color parsing - add rgb/rgba/hsl/hsla, #RGBA, auto format [d374d5e]
+- [x] Task: Wire advanced selectors into stylesheet parsing/matching [d374d5e]
+- [x] Task: Connect @keyframes to StyleSheet::parse [d374d5e]
+- [x] Task: Implement 6-tuple specificity (is_user_css, important, ids, classes, types, tie_breaker) [d374d5e]
+
+### 5.2 Medium Priority Fixes (Deferred)
+- [ ] Task: Variable substitution - only substitute $tokens, not $ in strings/comments
+- [ ] Task: Duration parsing - require ms/s units like Python
+
+> **Note:** High priority issues from code review have been addressed.
+> Medium priority issues deferred for future work.
+> Final tests: 986 passed (17 new tests added for color parsing, selectors, keyframes, specificity).
