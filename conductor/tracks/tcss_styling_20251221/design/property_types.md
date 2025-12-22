@@ -621,13 +621,9 @@ pub enum PropertyName {
     LinkHoverColor,
     LinkHoverBackgroundColor,
     LinkHoverStyle,
-    // Auto-links (URLs detected automatically)
-    AutoLinkColor,
-    AutoLinkBackgroundColor,
-    AutoLinkStyle,
-    AutoLinkHoverColor,
-    AutoLinkHoverBackgroundColor,
-    AutoLinkHoverStyle,
+    // Auto-link color toggle (boolean: auto-derive color from link target)
+    AutoLinkColor,       // Boolean: auto-derive link color
+    AutoLinkColorHover,  // Boolean: auto-derive link hover color
 
     // Special
     Hatch,
@@ -687,14 +683,14 @@ impl PropertyName {
             PropertyName::ScrollbarColor | PropertyName::ScrollbarColorHover |
             PropertyName::ScrollbarColorActive |
             PropertyName::LinkColor | PropertyName::LinkBackgroundColor |
-            PropertyName::LinkHoverColor | PropertyName::LinkHoverBackgroundColor |
-            PropertyName::AutoLinkColor | PropertyName::AutoLinkBackgroundColor |
-            PropertyName::AutoLinkHoverColor | PropertyName::AutoLinkHoverBackgroundColor => PropertyValueType::Color,
+            PropertyName::LinkHoverColor | PropertyName::LinkHoverBackgroundColor => PropertyValueType::Color,
 
             // Booleans
             PropertyName::AutoColor |
             PropertyName::AutoBorderTitleColor |
-            PropertyName::AutoBorderSubtitleColor => PropertyValueType::Bool,
+            PropertyName::AutoBorderSubtitleColor |
+            PropertyName::AutoLinkColor |
+            PropertyName::AutoLinkColorHover => PropertyValueType::Bool,
 
             // Enums
             PropertyName::Display => PropertyValueType::Display,
@@ -704,8 +700,7 @@ impl PropertyName {
             PropertyName::TextAlign => PropertyValueType::TextAlign,
             PropertyName::TextStyle |
             PropertyName::BorderTitleStyle | PropertyName::BorderSubtitleStyle |
-            PropertyName::LinkStyle | PropertyName::LinkHoverStyle |
-            PropertyName::AutoLinkStyle | PropertyName::AutoLinkHoverStyle => PropertyValueType::TextStyle,
+            PropertyName::LinkStyle | PropertyName::LinkHoverStyle => PropertyValueType::TextStyle,
             PropertyName::TextWrap => PropertyValueType::TextWrap,
             PropertyName::TextOverflow => PropertyValueType::TextOverflow,
             PropertyName::Layout => PropertyValueType::Layout,
@@ -819,8 +814,9 @@ impl PropertyName {
             PropertyName::Padding | PropertyName::PaddingTop |
             PropertyName::PaddingRight | PropertyName::PaddingBottom |
             PropertyName::PaddingLeft |
-            // Offset
+            // Offset and position
             PropertyName::Offset | PropertyName::OffsetX | PropertyName::OffsetY |
+            PropertyName::Position |
             // Colors
             PropertyName::Color | PropertyName::Background |
             PropertyName::BackgroundTint | PropertyName::Tint |
@@ -828,17 +824,19 @@ impl PropertyName {
             // Border colors
             PropertyName::BorderTitleColor | PropertyName::BorderTitleBackground |
             PropertyName::BorderSubtitleColor | PropertyName::BorderSubtitleBackground |
-            // Scrollbar colors (all variants)
+            // Scrollbar (colors and visibility)
             PropertyName::ScrollbarColor | PropertyName::ScrollbarColorHover |
             PropertyName::ScrollbarColorActive |
             PropertyName::ScrollbarBackgroundColor | PropertyName::ScrollbarBackgroundColorHover |
             PropertyName::ScrollbarBackgroundColorActive |
             PropertyName::ScrollbarCornerColor |
+            PropertyName::ScrollbarVisibility |
             // Link colors
             PropertyName::LinkColor | PropertyName::LinkBackgroundColor |
             PropertyName::LinkHoverColor | PropertyName::LinkHoverBackgroundColor |
-            PropertyName::AutoLinkColor | PropertyName::AutoLinkBackgroundColor |
-            PropertyName::AutoLinkHoverColor | PropertyName::AutoLinkHoverBackgroundColor |
+            // Text properties
+            PropertyName::TextWrap | PropertyName::TextOverflow |
+            PropertyName::LinePad |
             // Opacity
             PropertyName::Opacity | PropertyName::TextOpacity
         )

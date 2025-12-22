@@ -168,29 +168,54 @@ impl ColorSystem {
     /// Create from theme
     /// Defaults match Python's DEFAULT_COLORS in theme.py
     pub fn from_theme(theme: &Theme) -> Result<Self, ColorParseError> {
+        // Parse background first (needed for foreground default)
+        let background = theme.background.as_ref()
+            .map(|s| Color::parse(s))
+            .transpose()?
+            .unwrap_or(if theme.dark {
+                Color::parse("#121212")?   // DEFAULT_COLORS["dark"]["background"]
+            } else {
+                Color::parse("#efefef")?   // DEFAULT_COLORS["light"]["background"]
+            });
+
+        // Foreground defaults to background.inverse (Python behavior)
+        let foreground = theme.foreground.as_ref()
+            .map(|s| Color::parse(s))
+            .transpose()?
+            .unwrap_or_else(|| background.inverse());
+
+        // Parse primary (required)
+        let primary = Color::parse(&theme.primary)?;
+
+        // Optional colors with fallback chain (matches Python):
+        // secondary/warning/accent fall back to primary
+        // error/success fall back to secondary (or primary if no secondary)
+        let secondary = theme.secondary.as_ref()
+            .map(|s| Color::parse(s))
+            .transpose()?;
+        let fallback_secondary = secondary.clone().unwrap_or(primary.clone());
+
         Ok(ColorSystem {
-            primary: Color::parse(&theme.primary)?,
-            secondary: theme.secondary.as_ref().map(|s| Color::parse(s)).transpose()?,
-            warning: theme.warning.as_ref().map(|s| Color::parse(s)).transpose()?,
-            error: theme.error.as_ref().map(|s| Color::parse(s)).transpose()?,
-            success: theme.success.as_ref().map(|s| Color::parse(s)).transpose()?,
-            accent: theme.accent.as_ref().map(|s| Color::parse(s)).transpose()?,
-            foreground: theme.foreground.as_ref()
+            primary,
+            secondary,
+            warning: theme.warning.as_ref()
                 .map(|s| Color::parse(s))
                 .transpose()?
-                .unwrap_or(if theme.dark {
-                    Color::parse("#e0e0e0")?   // DEFAULT_COLORS["dark"]["foreground"]
-                } else {
-                    Color::parse("#1e1e1e")?   // DEFAULT_COLORS["light"]["foreground"]
-                }),
-            background: theme.background.as_ref()
+                .or_else(|| Some(primary.clone())),  // Falls back to primary
+            error: theme.error.as_ref()
                 .map(|s| Color::parse(s))
                 .transpose()?
-                .unwrap_or(if theme.dark {
-                    Color::parse("#121212")?   // DEFAULT_COLORS["dark"]["background"]
-                } else {
-                    Color::parse("#ffffff")?   // DEFAULT_COLORS["light"]["background"]
-                }),
+                .or_else(|| Some(fallback_secondary.clone())),  // Falls back to secondary
+            success: theme.success.as_ref()
+                .map(|s| Color::parse(s))
+                .transpose()?
+                .or_else(|| Some(fallback_secondary.clone())),  // Falls back to secondary
+            accent: theme.accent.as_ref()
+                .map(|s| Color::parse(s))
+                .transpose()?
+                .or_else(|| Some(primary.clone())),  // Falls back to primary
+            foreground,
+            background,
             surface: theme.surface.as_ref().map(|s| Color::parse(s)).transpose()?,
             panel: theme.panel.as_ref().map(|s| Color::parse(s)).transpose()?,
             boost: theme.boost.as_ref().map(|s| Color::parse(s)).transpose()?,
@@ -208,22 +233,22 @@ impl ColorSystem {
         // Primary color shades (with background and muted variants)
         self.add_color_shades(&mut vars, "primary", &self.primary);
 
-        // Optional semantic colors with shades
-        if let Some(ref c) = self.secondary {
-            self.add_color_shades(&mut vars, "secondary", c);
-        }
-        if let Some(ref c) = self.warning {
-            self.add_color_shades(&mut vars, "warning", c);
-        }
-        if let Some(ref c) = self.error {
-            self.add_color_shades(&mut vars, "error", c);
-        }
-        if let Some(ref c) = self.success {
-            self.add_color_shades(&mut vars, "success", c);
-        }
-        if let Some(ref c) = self.accent {
-            self.add_color_shades(&mut vars, "accent", c);
-        }
+        // Secondary color (uses fallback if None, so always has a value)
+        let secondary = self.secondary.clone().unwrap_or(self.primary.clone());
+        self.add_color_shades(&mut vars, "secondary", &secondary);
+
+        // Warning, error, success, accent - all have fallbacks so always generate
+        let warning = self.warning.clone().unwrap_or(self.primary.clone());
+        self.add_color_shades(&mut vars, "warning", &warning);
+
+        let error = self.error.clone().unwrap_or(secondary.clone());
+        self.add_color_shades(&mut vars, "error", &error);
+
+        let success = self.success.clone().unwrap_or(secondary.clone());
+        self.add_color_shades(&mut vars, "success", &success);
+
+        let accent = self.accent.clone().unwrap_or(self.primary.clone());
+        self.add_color_shades(&mut vars, "accent", &accent);
 
         // Base colors using Textual constants
         vars.insert("foreground".into(), self.foreground.to_css());
@@ -247,38 +272,19 @@ impl ColorSystem {
             vars.insert("boost".into(), c.to_css());
         }
 
-        // Text colors with alpha
+        // Text colors (Python uses auto % on background, simplified here)
         vars.insert("text".into(), self.foreground.with_alpha(self.text_alpha).to_css());
         vars.insert("text-muted".into(), self.foreground.with_alpha(0.6).to_css());
         vars.insert("text-disabled".into(), self.foreground.with_alpha(0.4).to_css());
 
-        // Contrast text for colored backgrounds (uses Textual's get_contrast_text)
-        // Python uses a tinted variant based on background, not pure black/white
-        let text_on_primary = self.contrast_text(&self.primary);
-        vars.insert("text-primary".into(), text_on_primary.to_css());
-
-        if let Some(ref secondary) = self.secondary {
-            let text_on_secondary = self.contrast_text(secondary);
-            vars.insert("text-secondary".into(), text_on_secondary.to_css());
-        }
-
-        // Contrast text for warning/error/success/accent backgrounds
-        if let Some(ref warning) = self.warning {
-            let text_on_warning = self.contrast_text(warning);
-            vars.insert("text-warning".into(), text_on_warning.to_css());
-        }
-        if let Some(ref error) = self.error {
-            let text_on_error = self.contrast_text(error);
-            vars.insert("text-error".into(), text_on_error.to_css());
-        }
-        if let Some(ref success) = self.success {
-            let text_on_success = self.contrast_text(success);
-            vars.insert("text-success".into(), text_on_success.to_css());
-        }
-        if let Some(ref accent) = self.accent {
-            let text_on_accent = self.contrast_text(accent);
-            vars.insert("text-accent".into(), text_on_accent.to_css());
-        }
+        // Contrast text for colored backgrounds
+        // Python: text-{color} = contrast_text.tint(color.with_alpha(0.66))
+        vars.insert("text-primary".into(), self.tinted_contrast_text(&self.primary).to_css());
+        vars.insert("text-secondary".into(), self.tinted_contrast_text(&secondary).to_css());
+        vars.insert("text-warning".into(), self.tinted_contrast_text(&warning).to_css());
+        vars.insert("text-error".into(), self.tinted_contrast_text(&error).to_css());
+        vars.insert("text-success".into(), self.tinted_contrast_text(&success).to_css());
+        vars.insert("text-accent".into(), self.tinted_contrast_text(&accent).to_css());
 
         // Add custom variables
         for (name, value) in &self.custom_variables {
@@ -316,25 +322,27 @@ impl ColorSystem {
         vars.insert(format!("{}-muted", name), muted.to_css());
     }
 
-    /// Get contrasting text color for a background (matches Python's get_contrast_text)
-    /// Uses a tinted variant based on the color being contrasted against,
-    /// not pure black/white.
+    /// Get base contrasting text color for a background (matches Python's get_contrast_text)
     fn contrast_text(&self, background: &Color) -> Color {
         // Calculate relative luminance
         let luminance = background.luminance();
 
         // Use WCAG contrast threshold (0.179 is the threshold for 4.5:1 contrast)
         if luminance > 0.179 {
-            // Light background: use dark text tinted toward the background color
-            // This creates a more cohesive look than pure black
-            let base = Color::parse("#000000").unwrap();
-            base.blend(background, 0.15).with_alpha(self.text_alpha)
+            // Light background: use dark text
+            Color::parse("#000000").unwrap().with_alpha(self.text_alpha)
         } else {
-            // Dark background: use light text tinted toward the background color
-            // This creates a more cohesive look than pure white
-            let base = Color::parse("#ffffff").unwrap();
-            base.blend(background, 0.15).with_alpha(self.text_alpha)
+            // Dark background: use light text
+            Color::parse("#ffffff").unwrap().with_alpha(self.text_alpha)
         }
+    }
+
+    /// Get tinted contrast text for colored backgrounds
+    /// Python: contrast_text.tint(color.with_alpha(0.66))
+    fn tinted_contrast_text(&self, color: &Color) -> Color {
+        let base = self.contrast_text(color);
+        // Tint the contrast text toward the color with 0.66 alpha blend
+        base.tint(&color.with_alpha(0.66))
     }
 }
 
@@ -345,7 +353,7 @@ pub static DEFAULT_DARK_BACKGROUND: Color = Color { r: 18, g: 18, b: 18, a: 1.0 
 pub static DEFAULT_DARK_SURFACE: Color = Color { r: 30, g: 30, b: 30, a: 1.0 };  // #1e1e1e
 
 /// Default light theme background (matches Python DEFAULT_COLORS["light"]["background"])
-pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 255, g: 255, b: 255, a: 1.0 };  // #ffffff
+pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 239, g: 239, b: 239, a: 1.0 };  // #efefef
 
 /// Default light theme surface (matches Python DEFAULT_COLORS["light"]["surface"])
 pub static DEFAULT_LIGHT_SURFACE: Color = Color { r: 245, g: 245, b: 245, a: 1.0 };  // #f5f5f5
@@ -410,6 +418,24 @@ impl Color {
             b: self.b,
             a: alpha,
         }
+    }
+
+    /// Get inverse color (complement in RGB space)
+    /// Used for foreground default when not specified
+    pub fn inverse(&self) -> Color {
+        Color {
+            r: 255 - self.r,
+            g: 255 - self.g,
+            b: 255 - self.b,
+            a: self.a,
+        }
+    }
+
+    /// Tint this color toward another color
+    /// Used for text-{color} variables: contrast_text.tint(color.with_alpha(0.66))
+    pub fn tint(&self, tint_color: &Color) -> Color {
+        // Blend this color with the tint color using tint's alpha as factor
+        self.blend(tint_color, tint_color.a)
     }
 }
 ```
