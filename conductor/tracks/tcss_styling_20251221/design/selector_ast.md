@@ -98,6 +98,7 @@ pub enum PseudoClass {
     // Focus states
     Focus,
     FocusWithin,
+    CanFocus,  // Widget can receive focus
     Blur,
 
     // Interaction states
@@ -133,6 +134,7 @@ impl PseudoClass {
         match name {
             "focus" => PseudoClass::Focus,
             "focus-within" => PseudoClass::FocusWithin,
+            "can-focus" => PseudoClass::CanFocus,
             "blur" => PseudoClass::Blur,
             "hover" => PseudoClass::Hover,
             "enabled" => PseudoClass::Enabled,

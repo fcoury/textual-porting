@@ -52,6 +52,17 @@ pub enum StyleValue {
     ScrollbarSizeHorizontal(i32),
     ScrollbarSizeVertical(i32),
     ScrollbarGutter(ScrollbarGutter),
+    ScrollbarVisibility(ScrollbarVisibility),
+
+    // Text wrapping and overflow
+    TextWrap(TextWrap),
+    TextOverflow(TextOverflow),
+
+    // Layout constraints
+    Expand(Expand),
+    Overlay(Overlay),
+    ConstrainX(Constrain),
+    ConstrainY(Constrain),
 
     // Special
     Transition(Transition),
@@ -408,6 +419,52 @@ pub enum ScrollbarGutter {
     Auto,
     Stable,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollbarVisibility {
+    #[default]
+    Auto,      // Show when needed
+    Hidden,    // Never show
+    Visible,   // Always show
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextWrap {
+    #[default]
+    Wrap,      // Wrap at word boundaries
+    NoWrap,    // No wrapping
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextOverflow {
+    #[default]
+    Fold,      // Fold text to next line
+    Clip,      // Clip at boundary
+    Ellipsis,  // Show ellipsis (...)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Expand {
+    #[default]
+    None,      // No expansion
+    Horizontal,
+    Vertical,
+    Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Overlay {
+    #[default]
+    None,      // Normal positioning
+    Screen,    // Overlay the screen
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Constrain {
+    #[default]
+    None,      // No constraint
+    Inflect,   // Constrain to inflection point
+}
 ```
 
 ## Property Name Registry
@@ -446,10 +503,12 @@ pub enum PropertyName {
     BorderTitleBackground,
     BorderTitleStyle,
     BorderTitleAlign,
+    AutoBorderTitleColor,    // Boolean: auto-derive title color
     BorderSubtitleColor,
     BorderSubtitleBackground,
     BorderSubtitleStyle,
     BorderSubtitleAlign,
+    AutoBorderSubtitleColor, // Boolean: auto-derive subtitle color
 
     // Outline
     Outline,
@@ -517,6 +576,7 @@ pub enum PropertyName {
 
     // Scrollbar (separate horizontal/vertical)
     ScrollbarGutter,
+    ScrollbarVisibility,  // Layout-affecting enum
     ScrollbarSizeHorizontal,
     ScrollbarSizeVertical,
     ScrollbarCornerColor,

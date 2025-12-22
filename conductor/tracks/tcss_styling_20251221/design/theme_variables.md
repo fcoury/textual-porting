@@ -200,14 +200,14 @@ impl ColorSystem {
         })
     }
 
-    /// Generate all CSS variables
+    /// Generate all CSS variables (matches Python ColorSystem.generate())
     pub fn generate_variables(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
 
         // Primary color shades
         self.add_color_shades(&mut vars, "primary", &self.primary);
 
-        // Optional semantic colors
+        // Optional semantic colors with shades
         if let Some(ref c) = self.secondary {
             self.add_color_shades(&mut vars, "secondary", c);
         }
@@ -224,24 +224,49 @@ impl ColorSystem {
             self.add_color_shades(&mut vars, "accent", c);
         }
 
-        // Base colors
+        // Base colors with defaults
         vars.insert("foreground".into(), self.foreground.to_css());
         vars.insert("background".into(), self.background.to_css());
 
-        if let Some(ref c) = self.surface {
-            vars.insert("surface".into(), c.to_css());
-        }
-        if let Some(ref c) = self.panel {
-            vars.insert("panel".into(), c.to_css());
-        }
+        // Surface defaults to slightly lighter/darker than background
+        let surface = self.surface.clone().unwrap_or_else(|| {
+            if self.dark {
+                self.background.lighten(0.04)
+            } else {
+                self.background.darken(0.04)
+            }
+        });
+        vars.insert("surface".into(), surface.to_css());
+
+        // Panel defaults to surface
+        let panel = self.panel.clone().unwrap_or(surface.clone());
+        vars.insert("panel".into(), panel.to_css());
+
         if let Some(ref c) = self.boost {
             vars.insert("boost".into(), c.to_css());
         }
 
-        // Text color with alpha
+        // Text colors with alpha
         vars.insert("text".into(), self.foreground.with_alpha(self.text_alpha).to_css());
         vars.insert("text-muted".into(), self.foreground.with_alpha(0.6).to_css());
         vars.insert("text-disabled".into(), self.foreground.with_alpha(0.4).to_css());
+
+        // Text on primary/secondary backgrounds
+        let text_on_primary = if self.primary.is_light() {
+            Color::parse("#000000").unwrap()
+        } else {
+            Color::parse("#ffffff").unwrap()
+        };
+        vars.insert("text-primary".into(), text_on_primary.to_css());
+
+        if let Some(ref secondary) = self.secondary {
+            let text_on_secondary = if secondary.is_light() {
+                Color::parse("#000000").unwrap()
+            } else {
+                Color::parse("#ffffff").unwrap()
+            };
+            vars.insert("text-secondary".into(), text_on_secondary.to_css());
+        }
 
         // Add custom variables
         for (name, value) in &self.custom_variables {
@@ -251,7 +276,7 @@ impl ColorSystem {
         vars
     }
 
-    /// Add color with lighten/darken shades
+    /// Add color with lighten/darken shades and muted variant
     fn add_color_shades(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
         // Base color
         vars.insert(name.into(), color.to_css());
@@ -278,9 +303,21 @@ impl ColorSystem {
         };
         vars.insert(format!("{}-background", name), bg.to_css());
 
-        // Muted variant
+        // Muted variant (reduced opacity for subtle use)
         let muted = color.with_alpha(0.5);
         vars.insert(format!("{}-muted", name), muted.to_css());
+    }
+}
+
+impl Color {
+    /// Check if color is light (for determining contrasting text color)
+    pub fn is_light(&self) -> bool {
+        // Use relative luminance formula
+        let r = self.r as f32 / 255.0;
+        let g = self.g as f32 / 255.0;
+        let b = self.b as f32 / 255.0;
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        luminance > 0.5
     }
 }
 
@@ -383,18 +420,34 @@ impl StylesheetVariables {
 ### Value Resolution
 
 ```rust
+/// Error for undefined variables
+#[derive(Debug, Clone)]
+pub struct UndefinedVariableError {
+    pub name: String,
+    pub line: usize,
+    pub column: usize,
+}
+
 /// Resolve all $variable references in a CSS value string
-pub fn resolve_variables(value: &str, vars: &StylesheetVariables) -> String {
+/// Returns error if any variable is undefined (matches Python behavior)
+pub fn resolve_variables(
+    value: &str,
+    vars: &StylesheetVariables,
+) -> Result<String, UndefinedVariableError> {
     let mut result = String::new();
     let mut chars = value.chars().peekable();
+    let mut column = 0;
 
     while let Some(c) = chars.next() {
+        column += 1;
         if c == '$' {
+            let var_start = column;
             // Parse variable name (alphanumeric, -, _)
             let mut name = String::new();
             while let Some(&c) = chars.peek() {
                 if c.is_alphanumeric() || c == '-' || c == '_' {
                     name.push(chars.next().unwrap());
+                    column += 1;
                 } else {
                     break;
                 }
@@ -404,18 +457,24 @@ pub fn resolve_variables(value: &str, vars: &StylesheetVariables) -> String {
                 if let Some(resolved) = vars.resolve(&name) {
                     result.push_str(&resolved);
                     continue;
+                } else {
+                    // Python raises parse error for undefined variables
+                    return Err(UndefinedVariableError {
+                        name,
+                        line: 0,  // Would be set by caller
+                        column: var_start,
+                    });
                 }
             }
 
-            // Variable not found, keep original $name
+            // Lone $ with no valid name - keep as-is
             result.push('$');
-            result.push_str(&name);
         } else {
             result.push(c);
         }
     }
 
-    result
+    Ok(result)
 }
 ```
 
@@ -531,7 +590,7 @@ impl Stylesheet {
     }
 
     /// Reparse all rules with current variables
-    pub fn reparse(&mut self) -> Result<(), ParseError> {
+    pub fn reparse(&mut self) -> Result<(), StylesheetError> {
         for (location, source) in &self.source {
             // First pass: extract $name: value definitions
             for line in source.content.lines() {
@@ -541,12 +600,23 @@ impl Stylesheet {
             }
 
             // Second pass: resolve $var references and parse rules
-            let resolved_css = resolve_variables(&source.content, &self.variables);
+            // Note: undefined variables cause parse error (matches Python)
+            let resolved_css = resolve_variables(&source.content, &self.variables)
+                .map_err(|e| StylesheetError::UndefinedVariable {
+                    name: e.name,
+                    location: location.clone(),
+                })?;
             let rules = self.parse_css(&resolved_css, source.scope.clone())?;
             // Update rules...
         }
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum StylesheetError {
+    Parse(ParseError),
+    UndefinedVariable { name: String, location: CssLocation },
 }
 ```
 
