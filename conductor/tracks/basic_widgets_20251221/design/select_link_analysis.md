@@ -74,10 +74,17 @@ def __init__(
     id: str | None = None,
     classes: str | None = None,
     disabled: bool = False,
-    tooltip: RenderableType | None = None,
     markup: bool = True,      # Enable markup parsing in option prompts
     compact: bool = False,    # Compact display mode (toggles -compact class)
 ):
+```
+
+### Initialization Behavior
+After mounting, OptionList auto-highlights the first option if options exist:
+```python
+def on_mount(self) -> None:
+    if self.option_count:
+        self.action_first()  # Highlights first option
 ```
 
 ### Reactive Properties
@@ -183,7 +190,8 @@ Dropdown selection widget combining a button with OptionList overlay.
 ```python
 SelectType = TypeVar("SelectType")
 
-class Select(Generic[SelectType], Widget):
+class Select(Generic[SelectType], Vertical, can_focus=True):
+    """Extends Vertical container (not Widget) for layout composition."""
 ```
 
 ### Special Values
@@ -203,14 +211,21 @@ BLANK = NoSelection()  # Select.BLANK
 ```python
 def __init__(
     self,
-    options: Iterable[tuple[str, SelectType]],  # (display_text, value) tuples
+    options: Iterable[tuple[RenderableType, SelectType]],  # (prompt, value) tuples
     *,
-    prompt: str = "Select",
-    allow_blank: bool = True,
+    prompt: str = "Select",           # Default prompt when nothing selected
+    allow_blank: bool = True,         # Allow deselection
     value: SelectType | NoSelection = BLANK,
-    name, id, classes, disabled, tooltip
+    type_to_search: bool = True,      # Enable type-to-search in overlay
+    compact: bool = False,            # Compact display mode
+    name: str | None = None,
+    id: str | None = None,
+    classes: str | None = None,
+    disabled: bool = False,
+    tooltip: RenderableType | None = None,
 ):
 ```
+**Note:** Option prompts accept `RenderableType` (any Rich renderable), not just strings.
 
 ### Messages
 ```python

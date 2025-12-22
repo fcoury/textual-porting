@@ -111,6 +111,16 @@ def __init__(
 ):
 ```
 
+### Initialization Behavior (CRITICAL)
+```python
+def __init__(self, value=False, ...):
+    ...
+    if value:
+        # Use set_reactive to avoid emitting Changed on init
+        self.set_reactive(Switch._slider_position, 1.0)
+```
+**Important:** When `value=True` is passed to the constructor, `_slider_position` is set to 1.0 directly using `set_reactive()` to avoid triggering the watcher and emitting Changed. The Rust port must NOT emit Changed or animate when setting initial value.
+
 ### Animation
 ```python
 def watch_value(self, value: bool) -> None:
@@ -213,11 +223,16 @@ class LoadingIndicator(Widget):
 
 ```python
 def render(self) -> RenderResult:
+    # Fallback for no animation
+    if self.app.animation_level == "none":
+        return Text("Loading...")  # Plain text, no animation
+
     dot = "\u25cf"  # ●
     gradient = Gradient(...)
     blends = [(elapsed * speed - dot_number / 8) % 1 for dot_number in range(5)]
     # Create colored dots based on blend values
 ```
+**Fallback:** When `app.animation_level == "none"`, renders plain "Loading..." text instead of animated dots.
 
 ### CSS Classes
 - `-textual-loading-indicator` - Special layer positioning
