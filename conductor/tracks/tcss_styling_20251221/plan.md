@@ -29,7 +29,7 @@
 - [x] Task: Write tests for property parsing [5004aa5]
 
 ### 3.2 Advanced Selectors
-- [ ] Task: Implement descendant combinator (space)
+- [x] Task: Implement descendant combinator (space) [8891c71]
 - [ ] Task: Implement child combinator (>)
 - [ ] Task: Implement compound selectors (Type.class#id)
 - [ ] Task: Implement selector specificity calculation
