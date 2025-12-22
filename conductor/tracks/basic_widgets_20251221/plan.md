@@ -4,8 +4,8 @@
 - [x] Task: Study Python Textual _static.py as base for Label [cc15181]
 - [x] Task: Analyze _button.py for variants, action support, DEFAULT_CSS [2061a96]
 - [x] Task: Study _input.py for ScrollView inheritance, selection, validation, suggester [0b89586]
-- [ ] Task: Document _header.py clock, icon, screen title integration
-- [ ] Task: Analyze _footer.py binding collection and display
+- [x] Task: Document _header.py clock, icon, screen title integration [f09dba5]
+- [x] Task: Analyze _footer.py binding collection and display [f09dba5]
 - [ ] Task: Study _checkbox.py, _radio_button.py, _switch.py patterns
 - [ ] Task: Analyze _select.py, _option_list.py, _selection_list.py
 - [ ] Task: Document _progress_bar.py, _loading_indicator.py
