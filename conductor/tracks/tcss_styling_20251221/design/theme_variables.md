@@ -233,28 +233,27 @@ impl ColorSystem {
         // Primary color shades - generates:
         //   primary, primary-lighten-{1,2,3}, primary-darken-{1,2,3},
         //   primary-background, primary-muted
-        self.add_color_shades(&mut vars, "primary", &self.primary);
+        self.add_color_shades_full(&mut vars, "primary", &self.primary);
 
         // Secondary color (uses fallback if None, so always has a value) - generates:
         //   secondary, secondary-lighten-{1,2,3}, secondary-darken-{1,2,3},
         //   secondary-background, secondary-muted
         let secondary = self.secondary.clone().unwrap_or(self.primary.clone());
-        self.add_color_shades(&mut vars, "secondary", &secondary);
+        self.add_color_shades_full(&mut vars, "secondary", &secondary);
 
-        // Warning, error, success, accent - all have fallbacks so always generate
-        // Each generates: {name}, {name}-lighten-{1,2,3}, {name}-darken-{1,2,3},
-        //                 {name}-background, {name}-muted
+        // Warning, error, success, accent - only get base + lighten/darken shades
+        // (NOT -background or -muted variants, per Python behavior)
         let warning = self.warning.clone().unwrap_or(self.primary.clone());
-        self.add_color_shades(&mut vars, "warning", &warning);
+        self.add_color_shades_basic(&mut vars, "warning", &warning);
 
         let error = self.error.clone().unwrap_or(secondary.clone());
-        self.add_color_shades(&mut vars, "error", &error);
+        self.add_color_shades_basic(&mut vars, "error", &error);
 
         let success = self.success.clone().unwrap_or(secondary.clone());
-        self.add_color_shades(&mut vars, "success", &success);
+        self.add_color_shades_basic(&mut vars, "success", &success);
 
         let accent = self.accent.clone().unwrap_or(self.primary.clone());
-        self.add_color_shades(&mut vars, "accent", &accent);
+        self.add_color_shades_basic(&mut vars, "accent", &accent);
 
         // Base colors using Textual constants
         vars.insert("foreground".into(), self.foreground.to_css());
@@ -276,23 +275,31 @@ impl ColorSystem {
         });
         vars.insert("boost".into(), boost.to_css());
 
-        // Panel: in dark mode = surface.blend(primary, 0.1) + boost, else surface
+        // Panel: Python ALWAYS uses surface.blend(primary, 0.1) when unset
+        // Dark mode also adds boost overlay
         let panel = self.panel.clone().unwrap_or_else(|| {
+            let base = surface.blend(&self.primary, 0.1);
             if self.dark {
-                // Python: surface.blend(primary, 0.1) then adds boost overlay
-                surface.blend(&self.primary, 0.1).blend(&boost, boost.a)
+                // Dark mode: add boost overlay
+                base.blend(&boost, boost.a)
             } else {
-                surface.clone()
+                base
             }
         });
         vars.insert("panel".into(), panel.to_css());
 
         // Text colors: Python emits literal "auto X%" strings, not concrete colors
         // These get resolved at runtime based on background
-        // (or ansi_default for ANSI color mode)
-        vars.insert("text".into(), "auto 87%".into());
-        vars.insert("text-muted".into(), "auto 60%".into());
-        vars.insert("text-disabled".into(), "auto 38%".into());
+        // For ANSI color mode, Python emits "ansi_default" instead
+        if self.is_ansi_foreground() {
+            vars.insert("text".into(), "ansi_default".into());
+            vars.insert("text-muted".into(), "ansi_default".into());
+            vars.insert("text-disabled".into(), "ansi_default".into());
+        } else {
+            vars.insert("text".into(), "auto 87%".into());
+            vars.insert("text-muted".into(), "auto 60%".into());
+            vars.insert("text-disabled".into(), "auto 38%".into());
+        }
 
         // Contrast text for colored backgrounds
         // Python: text-{color} = contrast_text.tint(color.with_alpha(0.66))
@@ -311,9 +318,9 @@ impl ColorSystem {
         vars
     }
 
-    /// Add color with lighten/darken shades, background, and muted variants
-    /// Matches Python ColorSystem._get_shades() logic
-    fn add_color_shades(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
+    /// Add basic color shades (base + lighten/darken only)
+    /// Used for warning, error, success, accent
+    fn add_color_shades_basic(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
         // Base color
         vars.insert(name.into(), color.to_css());
 
@@ -330,6 +337,13 @@ impl ColorSystem {
             let shade = color.darken(factor);
             vars.insert(format!("{}-darken-{}", name, i), shade.to_css());
         }
+    }
+
+    /// Add full color shades including -background and -muted variants
+    /// Used ONLY for primary and secondary (per Python behavior)
+    fn add_color_shades_full(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
+        // Add basic shades first
+        self.add_color_shades_basic(vars, name, color);
 
         // Background variant: Python uses different logic for dark/light themes
         // Dark: color darkened by 2*spread, then blended 85% toward background
@@ -342,9 +356,17 @@ impl ColorSystem {
         };
         vars.insert(format!("{}-background", name), bg.to_css());
 
-        // Muted variant: color with reduced alpha for subtle backgrounds
-        let muted = color.with_alpha(0.3);
+        // Muted variant: Python uses blend(background, 0.7), not alpha
+        let muted = color.blend(&self.background, 0.7);
         vars.insert(format!("{}-muted", name), muted.to_css());
+    }
+
+    /// Check if foreground is an ANSI color (for text variable generation)
+    fn is_ansi_foreground(&self) -> bool {
+        // ANSI colors are terminal palette colors (0-15)
+        // For now, we detect by checking if foreground matches default ANSI
+        // In practice, this would be set based on theme configuration
+        false  // Default: not ANSI mode
     }
 
     /// Get base contrasting text color for a background (matches Python's get_contrast_text)
