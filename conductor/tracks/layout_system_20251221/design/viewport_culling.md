@@ -460,17 +460,34 @@ pub fn handle_scroll(
         return;
     }
 
-    // Get the content widget (ScrollView's single child that contains all scrollable content)
-    let content_id = registry.children(scroll_view).next().unwrap();
+    // Get the content widget ID via registry (not by child order, which includes scrollbars)
+    // Registry exposes scroll_content() for scrollable widgets to avoid downcast issues
+    let content_id = registry.get_scroll_content(scroll_view)
+        .expect("scroll_view must have content");
 
-    // Traverse content subtree, accumulating coordinates to content space
-    let newly_visible = find_widgets_in_regions(
-        content_id,
-        Offset::ZERO,  // Content widget is at (0,0) in content space
-        &exposed_rects,
-        registry,
-        placement_cache,
-    );
+    // Traverse CHILDREN of content widget (not content itself)
+    // Content widget's placement.region includes -scroll_offset (for rendering),
+    // but in content space, content is at (0,0). So we start children at Offset::ZERO.
+    let mut newly_visible = Vec::new();
+    for child_id in registry.children(content_id) {
+        newly_visible.extend(find_widgets_in_regions(
+            child_id,
+            Offset::ZERO,  // Children are relative to content, which is (0,0) in content space
+            &exposed_rects,
+            registry,
+            placement_cache,
+        ));
+    }
+
+    // Also check content widget itself (in case it renders something)
+    let content_placement = placement_cache.get_placement(content_id);
+    if let Some(p) = content_placement {
+        // Content spans the full virtual size at (0,0) in content space
+        let content_region = Rect::new(0, 0, p.region.width, p.region.height);
+        if exposed_rects.iter().any(|r| r.intersects(&content_region)) {
+            newly_visible.push(content_id);
+        }
+    }
 
     dirty.mark_widgets_dirty(newly_visible);
 }
@@ -597,6 +614,7 @@ pub fn scroll_blit(
     );
 
     // Record damage for newly exposed regions (screen-space)
+    // Vertical scroll damage
     if dy > 0 {
         // Scrolled down, top strip is new
         damage.record_damage(Rect::new(viewport.x, viewport.y, viewport.width, dy as u16));
@@ -609,7 +627,20 @@ pub fn scroll_blit(
             (-dy) as u16,
         ));
     }
-    // Similar for horizontal
+
+    // Horizontal scroll damage
+    if dx > 0 {
+        // Scrolled right, left strip is new
+        damage.record_damage(Rect::new(viewport.x, viewport.y, dx as u16, viewport.height));
+    } else if dx < 0 {
+        // Scrolled left, right strip is new
+        damage.record_damage(Rect::new(
+            viewport.x + viewport.width as i16 + dx,
+            viewport.y,
+            (-dx) as u16,
+            viewport.height,
+        ));
+    }
 }
 ```
 
@@ -715,3 +746,23 @@ impl PlacementCache {
     }
 }
 ```
+
+### Required WidgetRegistry Methods
+
+The culling and scroll handling algorithms rely on these WidgetRegistry methods:
+
+```rust
+impl WidgetRegistry {
+    /// Get scroll state for a scrollable widget (returns None if not scrollable).
+    pub fn get_scroll_state(&self, id: WidgetId) -> Option<&ScrollState>;
+
+    /// Get the content widget ID for a scrollable container.
+    /// This avoids the need to downcast to ScrollView or rely on child order.
+    pub fn get_scroll_content(&self, id: WidgetId) -> Option<WidgetId>;
+
+    /// Iterate over a widget's children.
+    pub fn children(&self, id: WidgetId) -> impl Iterator<Item = WidgetId>;
+}
+```
+
+The `get_scroll_content` method is essential because ScrollView has multiple children (content + scrollbars) and child order is not guaranteed. Exposing content ID via the registry avoids downcasting generic widgets.

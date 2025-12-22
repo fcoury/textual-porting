@@ -20,12 +20,12 @@
 ## Phase 3: Implementation
 
 ### 3.1 Extended Property Types
-- [ ] Task: Implement layout properties (width, height, min-*, max-*)
-- [ ] Task: Implement box model properties (margin, padding, border)
-- [ ] Task: Implement color properties (color, background, border-color)
-- [ ] Task: Implement text properties (text-align, text-style)
-- [ ] Task: Implement display properties (display, visibility, opacity)
-- [ ] Task: Implement scroll properties (overflow, scrollbar-*)
+- [x] Task: Implement layout properties (width, height, min-*, max-*) [9a33880]
+- [x] Task: Implement box model properties (margin, padding, border) [b7d0bfe]
+- [x] Task: Implement color properties (color, background, border-color) [b7d0bfe]
+- [x] Task: Implement text properties (text-align, text-style) [2fc5562]
+- [x] Task: Implement display properties (display, visibility, opacity) [108ab64]
+- [x] Task: Implement scroll properties (overflow, scrollbar-*) [5004aa5]
 - [ ] Task: Write tests for property parsing
 
 ### 3.2 Advanced Selectors
