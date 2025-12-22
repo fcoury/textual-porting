@@ -92,7 +92,7 @@ def __init__(self, *content, ...):
 
 ### Reactive Properties
 - `highlighted: reactive[int | None]` - Currently highlighted option index
-- `compact: reactive[bool] = False` - Toggles `-compact` CSS class
+- `compact: reactive[bool] = False` - Toggles `-textual-compact` CSS class
 
 ### OptionListContent Type
 ```python
@@ -286,6 +286,14 @@ class Selection(Generic[SelectionType], Option):
         disabled: bool = False
     ):
 ```
+
+### Public Properties
+```python
+@property
+def selected(self) -> list[SelectionType]:
+    """Returns list of values for all currently selected options."""
+```
+**User-facing API:** Use `selected` to get a list of all selected values.
 
 ### Component Classes
 - `selection-list--button` - Default button style

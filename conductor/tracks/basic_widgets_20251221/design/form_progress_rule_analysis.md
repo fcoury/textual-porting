@@ -17,6 +17,14 @@ class ToggleButton(Static, can_focus=True):
 - `value: reactive[bool] = False` - Toggle state
 - `compact: reactive[bool] = False` - Compact mode
 
+### watch_value Behavior
+```python
+def watch_value(self, value: bool) -> None:
+    self.set_class(value, "-on")  # Toggle -on CSS class
+    self.post_message(self.Changed(self, value))  # Emit Changed message
+```
+**CSS Coupling:** The `-on` class is toggled based on `value` for styling the "on" state.
+
 ### Initial Value Behavior (CRITICAL)
 ```python
 def __init__(self, label="", value=False, ...):
