@@ -436,8 +436,14 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait SuggesterImpl: Send + Sync + std::fmt::Debug {
     /// Get a suggestion for the given value.
-    /// Note: The value is already normalized (casefolded if not case_sensitive).
-    async fn get_suggestion(&self, value: &str) -> Option<String>;
+    ///
+    /// Args:
+    ///   value: The input value (already normalized if case_sensitive=false)
+    ///   case_sensitive: Whether matching should be case-sensitive
+    ///
+    /// Note: When case_sensitive=false, the value is already lowercased.
+    /// Implementations should also lowercase their comparison targets.
+    async fn get_suggestion(&self, value: &str, case_sensitive: bool) -> Option<String>;
 }
 
 /// Base suggester with built-in caching and normalization.
@@ -475,10 +481,13 @@ impl<T: SuggesterImpl> Suggester<T> {
     /// Handles normalization and caching (matches Python's _get_suggestion).
     pub async fn request_suggestion(&self, requester: WidgetId, value: &str) -> Option<SuggestionReady> {
         // Normalize value if not case sensitive
+        // Note: Python uses str.casefold() which is more aggressive than lowercase
+        // for Unicode. In Rust, to_lowercase() is sufficient for most cases.
+        // For full Unicode casefold support, use the `caseless` crate.
         let normalized_value = if self.case_sensitive {
             value.to_string()
         } else {
-            value.to_lowercase()  // casefold equivalent
+            value.to_lowercase()
         };
 
         // Check cache first
@@ -492,8 +501,8 @@ impl<T: SuggesterImpl> Suggester<T> {
             }
         }
 
-        // Get from implementation
-        let suggestion = self.inner.get_suggestion(&normalized_value).await;
+        // Get from implementation, passing case_sensitive for comparison logic
+        let suggestion = self.inner.get_suggestion(&normalized_value, self.case_sensitive).await;
 
         // Cache the result
         if let Some(ref cache_mutex) = self.cache {
@@ -530,16 +539,27 @@ impl SuggestFromListImpl {
 
 #[async_trait]
 impl SuggesterImpl for SuggestFromListImpl {
-    async fn get_suggestion(&self, value: &str) -> Option<String> {
+    async fn get_suggestion(&self, value: &str, case_sensitive: bool) -> Option<String> {
         if value.is_empty() {
             return None;
         }
 
-        // Note: value is already normalized by Suggester if case_sensitive=false
-        self.suggestions
-            .iter()
-            .find(|s| s.to_lowercase().starts_with(value))
-            .cloned()
+        // Value is already normalized by Suggester (lowercased if case_sensitive=false).
+        // We need to normalize suggestions the same way for comparison,
+        // but return the original (non-normalized) suggestion.
+        if case_sensitive {
+            // Case-sensitive: direct comparison
+            self.suggestions
+                .iter()
+                .find(|s| s.starts_with(value))
+                .cloned()
+        } else {
+            // Case-insensitive: lowercase suggestion for comparison
+            self.suggestions
+                .iter()
+                .find(|s| s.to_lowercase().starts_with(value))
+                .cloned()
+        }
     }
 }
 
@@ -548,23 +568,24 @@ pub type SuggestFromList = Suggester<SuggestFromListImpl>;
 
 impl SuggestFromList {
     /// Create a SuggestFromList with Python-compatible defaults.
-    /// use_cache=true, case_sensitive=false (Python defaults).
+    /// use_cache=true, case_sensitive=true (Python defaults).
     pub fn from_list(suggestions: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Suggester::new(
             SuggestFromListImpl::new(suggestions),
-            true,   // use_cache
-            false,  // case_sensitive (Python default is False)
+            true,  // use_cache (Python default)
+            true,  // case_sensitive (Python default)
         )
     }
 
     /// Create with explicit case sensitivity.
-    pub fn from_list_case_sensitive(
+    pub fn from_list_with_options(
         suggestions: impl IntoIterator<Item = impl Into<String>>,
+        use_cache: bool,
         case_sensitive: bool,
     ) -> Self {
         Suggester::new(
             SuggestFromListImpl::new(suggestions),
-            true,
+            use_cache,
             case_sensitive,
         )
     }

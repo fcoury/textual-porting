@@ -138,6 +138,13 @@ pub struct RadioSetChanged {
     pub pressed: WidgetRef<RadioButton>,
 }
 
+impl RadioSetChanged {
+    /// Alias for radio_set (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<RadioSet> {
+        &self.radio_set
+    }
+}
+
 impl Message for RadioSetChanged {}
 ```
 
@@ -369,6 +376,13 @@ impl<T: Clone + Send + Sync + std::fmt::Debug + 'static> Message for SelectionTo
 pub struct SelectedChanged<T: Clone> {
     /// Reference to the selection list.
     pub selection_list: WidgetRef<SelectionList<T>>,
+}
+
+impl<T: Clone> SelectedChanged<T> {
+    /// Alias for selection_list (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<SelectionList<T>> {
+        &self.selection_list
+    }
 }
 
 impl<T: Clone + Send + Sync + std::fmt::Debug + 'static> Message for SelectedChanged<T> {}
