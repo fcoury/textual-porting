@@ -45,14 +45,14 @@
 - [x] Task: Write tests for Label [1976105]
 
 ### 3.3 Button Widget (REBUILD)
-- [ ] Task: Remove existing Button implementation
-- [ ] Task: Implement Button with ButtonVariant
-- [ ] Task: Implement label reactive property
-- [ ] Task: Implement action parameter support
-- [ ] Task: Implement disabled state
-- [ ] Task: Add DEFAULT_CSS with all variant styles
-- [ ] Task: Implement Pressed message with button reference
-- [ ] Task: Write tests for Button
+- [x] Task: Remove existing Button implementation [bcb97f9]
+- [x] Task: Implement Button with ButtonVariant [bcb97f9]
+- [x] Task: Implement label reactive property [bcb97f9]
+- [x] Task: Implement action parameter support [bcb97f9]
+- [x] Task: Implement disabled state [bcb97f9]
+- [x] Task: Add DEFAULT_CSS with all variant styles [bcb97f9]
+- [x] Task: Implement Pressed message with button reference [bcb97f9]
+- [x] Task: Write tests for Button [bcb97f9]
 
 ### 3.4 Input Widget (REBUILD - extends ScrollView)
 - [ ] Task: Remove existing Input implementation
