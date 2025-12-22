@@ -32,7 +32,7 @@
 - [x] Task: Implement descendant combinator (space) [8891c71]
 - [x] Task: Implement child combinator (>) [344fc74]
 - [x] Task: Implement compound selectors (Type.class#id) [b65d75b]
-- [ ] Task: Implement selector specificity calculation
+- [x] Task: Implement selector specificity calculation [99ab2da]
 - [ ] Task: Write tests for selector matching
 
 > **Note:** Sibling combinators (`+`, `~`) are NOT supported in TCSS per Python Textual analysis.
