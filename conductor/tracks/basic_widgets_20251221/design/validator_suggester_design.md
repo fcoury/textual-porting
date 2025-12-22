@@ -429,6 +429,15 @@ use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use async_trait::async_trait;
+use unicase::UniCase;  // For Unicode case-insensitive comparison
+
+/// Unicode casefold equivalent for Python parity.
+/// Uses the `unicase` crate which implements Unicode case folding.
+/// Example: "ß" → "ss", "İ" → "i̇"
+fn casefold(s: &str) -> String {
+    // UniCase uses Unicode case folding internally
+    UniCase::new(s).to_folded_case()
+}
 
 /// Trait for custom suggestion logic.
 /// Implementors only need to provide the core suggestion logic.
@@ -481,13 +490,11 @@ impl<T: SuggesterImpl> Suggester<T> {
     /// Handles normalization and caching (matches Python's _get_suggestion).
     pub async fn request_suggestion(&self, requester: WidgetId, value: &str) -> Option<SuggestionReady> {
         // Normalize value if not case sensitive
-        // Note: Python uses str.casefold() which is more aggressive than lowercase
-        // for Unicode. In Rust, to_lowercase() is sufficient for most cases.
-        // For full Unicode casefold support, use the `caseless` crate.
+        // Uses casefold() for Python parity (more aggressive than lowercase for Unicode)
         let normalized_value = if self.case_sensitive {
             value.to_string()
         } else {
-            value.to_lowercase()
+            casefold(value)
         };
 
         // Check cache first
@@ -544,7 +551,7 @@ impl SuggesterImpl for SuggestFromListImpl {
             return None;
         }
 
-        // Value is already normalized by Suggester (lowercased if case_sensitive=false).
+        // Value is already normalized by Suggester (casefolded if case_sensitive=false).
         // We need to normalize suggestions the same way for comparison,
         // but return the original (non-normalized) suggestion.
         if case_sensitive {
@@ -554,10 +561,10 @@ impl SuggesterImpl for SuggestFromListImpl {
                 .find(|s| s.starts_with(value))
                 .cloned()
         } else {
-            // Case-insensitive: lowercase suggestion for comparison
+            // Case-insensitive: casefold suggestion for comparison (Python parity)
             self.suggestions
                 .iter()
-                .find(|s| s.to_lowercase().starts_with(value))
+                .find(|s| casefold(s).starts_with(value))
                 .cloned()
         }
     }
