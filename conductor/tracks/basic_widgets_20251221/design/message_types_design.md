@@ -37,6 +37,11 @@ impl ButtonPressed {
     pub fn new(button: WidgetRef<Button>) -> Self {
         Self { button }
     }
+
+    /// Alias for button (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<Button> {
+        &self.button
+    }
 }
 
 impl Message for ButtonPressed {}
@@ -175,6 +180,13 @@ pub struct InputSubmitted {
     pub validation_result: Option<ValidationResult>,
 }
 
+impl InputSubmitted {
+    /// Alias for input (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<Input> {
+        &self.input
+    }
+}
+
 impl Message for InputSubmitted {}
 
 /// Message sent when Input loses focus.
@@ -186,6 +198,13 @@ pub struct InputBlurred {
     pub value: String,
     /// Validation result (if validation was triggered).
     pub validation_result: Option<ValidationResult>,
+}
+
+impl InputBlurred {
+    /// Alias for input (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<Input> {
+        &self.input
+    }
 }
 
 impl Message for InputBlurred {}
@@ -205,6 +224,13 @@ pub struct OptionMessage {
     pub option_id: Option<String>,
     /// The option's index in the list.
     pub option_index: usize,
+}
+
+impl OptionMessage {
+    /// Alias for option_list (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<OptionList> {
+        &self.option_list
+    }
 }
 
 /// Message sent when an option is highlighted (cursor moves).
@@ -280,6 +306,13 @@ pub struct SelectionMessage<T: Clone> {
     pub selection_index: usize,
 }
 
+impl<T: Clone> SelectionMessage<T> {
+    /// Alias for selection_list (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<SelectionList<T>> {
+        &self.selection_list
+    }
+}
+
 /// Message sent when a selection is highlighted (cursor moves).
 #[derive(Debug, Clone)]
 pub struct SelectionHighlighted<T: Clone>(pub SelectionMessage<T>);
@@ -309,21 +342,6 @@ pub struct SelectedChanged<T: Clone> {
 }
 
 impl<T: Clone + Send + Sync + std::fmt::Debug + 'static> Message for SelectedChanged<T> {}
-```
-
-### Link
-
-```rust
-/// Message sent when a Link is clicked/activated.
-#[derive(Debug, Clone)]
-pub struct LinkClicked {
-    /// Reference to the link.
-    pub link: WidgetRef<Link>,
-    /// The URL to open.
-    pub url: String,
-}
-
-impl Message for LinkClicked {}
 ```
 
 ## Widget Reference Type

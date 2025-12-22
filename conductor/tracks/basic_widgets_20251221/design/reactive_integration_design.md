@@ -53,14 +53,17 @@ variant: Option<LabelVariant>,  // reactive (applies CSS class)
 
 ### Button
 ```rust
-label: String,                  // var
-variant: ButtonVariant,         // var
+label: String,                  // reactive → watch_label (updates render)
+variant: ButtonVariant,         // reactive → watch_variant (updates CSS class)
 disabled: bool,                 // reactive (toggles -disabled class)
+compact: bool,                  // reactive (toggles -textual-compact class)
+flat: bool,                     // reactive (toggles -flat class)
 ```
 
 ### Input
 ```rust
 value: String,                  // reactive
+selection: Selection,           // reactive (cursor position and selection range)
 placeholder: String,            // reactive
 password: bool,                 // reactive
 cursor_blink: bool,            // reactive
@@ -257,6 +260,9 @@ impl ToggleButton {
 
 | Widget | Property | Class Toggled |
 |--------|----------|---------------|
+| Button | variant | `-primary` / `-success` / `-warning` / `-error` |
+| Button | compact | `-textual-compact` |
+| Button | flat | `-flat` |
 | ToggleButton | value | `-on` |
 | Switch | _slider_position (==1.0) | `-on` |
 | Header | tall | `-tall` |

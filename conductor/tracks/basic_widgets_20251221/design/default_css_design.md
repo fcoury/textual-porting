@@ -159,14 +159,16 @@ Label.accent {
 Button {
     background: $primary;
     color: $text-primary;
-    border: tall $background-lighten-1;
+    border: tall $border;
     height: 3;
     min-width: 16;
     text-align: center;
     content-align: center middle;
+    padding: 0 2;
 }
 Button:hover {
     background: $primary-darken-1;
+    border: tall $border-hover;
 }
 Button:focus {
     text-style: bold;
@@ -175,21 +177,56 @@ Button.-active {
     background: $primary-darken-2;
     tint: $foreground 30%;
 }
+Button.-textual-compact {
+    height: 1;
+    border: none;
+    padding: 0 1;
+}
+/* Flat style removes border/background, shows only on hover */
+Button.-flat {
+    background: transparent;
+    border: none;
+}
+Button.-flat:hover {
+    background: $surface;
+}
+/* Default variant (no explicit variant) */
+Button.-default {
+    background: $surface;
+    color: $foreground;
+    border: tall $border;
+}
+Button.-default:hover {
+    background: $surface-lighten-1;
+}
+/* Variant styles */
 Button.-primary {
     background: $primary;
     color: $text-primary;
+}
+Button.-primary:hover {
+    background: $primary-darken-1;
 }
 Button.-success {
     background: $success;
     color: $text-success;
 }
+Button.-success:hover {
+    background: $success-darken-1;
+}
 Button.-warning {
     background: $warning;
     color: $text-warning;
 }
+Button.-warning:hover {
+    background: $warning-darken-1;
+}
 Button.-error {
     background: $error;
     color: $text-error;
+}
+Button.-error:hover {
+    background: $error-darken-1;
 }
 ```
 
@@ -281,7 +318,7 @@ Switch.-on {
 OptionList {
     width: 100%;
     height: auto;
-    max-height: 10;
+    max-height: 100%;
     background: $surface;
     border: tall $border-blurred;
 }

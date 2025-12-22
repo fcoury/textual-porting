@@ -55,9 +55,13 @@ impl ValidationResult {
 
 ```rust
 /// A single validation failure.
+///
+/// Note: Python Textual's Failure stores a reference to the actual validator.
+/// In Rust, we store the validator as a trait object to match this behavior.
 #[derive(Debug, Clone)]
 pub struct Failure {
-    /// The validator that produced this failure.
+    /// The validator that produced this failure (as trait object name for display).
+    /// In Python, this is `validator: Validator | None`. We use the type name.
     pub validator_name: String,
     /// The value that failed validation.
     pub value: Option<String>,
@@ -66,6 +70,17 @@ pub struct Failure {
 }
 
 impl Failure {
+    /// Create a failure from a validator instance.
+    /// Extracts the validator's name for the failure record.
+    pub fn from_validator<V: Validator + ?Sized>(validator: &V) -> Self {
+        Self {
+            validator_name: validator.name().to_string(),
+            value: None,
+            description: None,
+        }
+    }
+
+    /// Create a failure with just a name (for cases where validator ref isn't available).
     pub fn new(validator_name: impl Into<String>) -> Self {
         Self {
             validator_name: validator_name.into(),
@@ -142,7 +157,7 @@ impl Validator for Integer {
                 if let Some(min) = self.minimum {
                     if n < min {
                         return ValidationResult::failure(vec![
-                            Failure::new("Integer")
+                            Failure::from_validator(self)
                                 .with_value(value)
                                 .with_description(format!("Value must be at least {}", min))
                         ]);
@@ -151,7 +166,7 @@ impl Validator for Integer {
                 if let Some(max) = self.maximum {
                     if n > max {
                         return ValidationResult::failure(vec![
-                            Failure::new("Integer")
+                            Failure::from_validator(self)
                                 .with_value(value)
                                 .with_description(format!("Value must be at most {}", max))
                         ]);
@@ -160,7 +175,7 @@ impl Validator for Integer {
                 ValidationResult::success()
             }
             Err(_) => ValidationResult::failure(vec![
-                Failure::new("Integer")
+                Failure::from_validator(self)
                     .with_value(value)
                     .with_description("Must be a valid integer")
             ]),
@@ -186,7 +201,7 @@ impl Validator for Number {
                 if let Some(min) = self.minimum {
                     if n < min {
                         return ValidationResult::failure(vec![
-                            Failure::new("Number")
+                            Failure::from_validator(self)
                                 .with_value(value)
                                 .with_description(format!("Value must be at least {}", min))
                         ]);
@@ -195,7 +210,7 @@ impl Validator for Number {
                 if let Some(max) = self.maximum {
                     if n > max {
                         return ValidationResult::failure(vec![
-                            Failure::new("Number")
+                            Failure::from_validator(self)
                                 .with_value(value)
                                 .with_description(format!("Value must be at most {}", max))
                         ]);
@@ -204,7 +219,7 @@ impl Validator for Number {
                 ValidationResult::success()
             }
             Err(_) => ValidationResult::failure(vec![
-                Failure::new("Number")
+                Failure::from_validator(self)
                     .with_value(value)
                     .with_description("Must be a valid number")
             ]),
@@ -233,7 +248,7 @@ impl Validator for Length {
         if let Some(min) = self.minimum {
             if len < min {
                 failures.push(
-                    Failure::new("Length")
+                    Failure::from_validator(self)
                         .with_value(value)
                         .with_description(format!("Must be at least {} characters", min))
                 );
@@ -243,7 +258,7 @@ impl Validator for Length {
         if let Some(max) = self.maximum {
             if len > max {
                 failures.push(
-                    Failure::new("Length")
+                    Failure::from_validator(self)
                         .with_value(value)
                         .with_description(format!("Must be at most {} characters", max))
                 );
@@ -284,7 +299,7 @@ impl Validator for Regex {
             ValidationResult::success()
         } else {
             ValidationResult::failure(vec![
-                Failure::new("Regex")
+                Failure::from_validator(self)
                     .with_value(value)
                     .with_description(&self.description)
             ])
@@ -306,7 +321,7 @@ impl Validator for Url {
         match url::Url::parse(value) {
             Ok(_) => ValidationResult::success(),
             Err(_) => ValidationResult::failure(vec![
-                Failure::new("Url")
+                Failure::from_validator(self)
                     .with_value(value)
                     .with_description("Must be a valid URL")
             ]),
@@ -396,11 +411,13 @@ pub trait Suggester: Send + Sync + std::fmt::Debug {
 
 ```rust
 /// A suggester that provides suggestions from a fixed list.
+///
+/// Note: Python Textual defaults `case_sensitive=True`.
 #[derive(Debug, Clone)]
 pub struct SuggestFromList {
     /// The list of possible suggestions.
     suggestions: Vec<String>,
-    /// Whether matching is case-sensitive.
+    /// Whether matching is case-sensitive (default: true, matches Python).
     case_sensitive: bool,
 }
 
@@ -408,7 +425,7 @@ impl SuggestFromList {
     pub fn new(suggestions: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             suggestions: suggestions.into_iter().map(Into::into).collect(),
-            case_sensitive: false,
+            case_sensitive: true,  // Python default is True
         }
     }
 

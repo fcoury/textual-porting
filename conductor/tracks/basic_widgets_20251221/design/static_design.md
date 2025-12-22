@@ -55,6 +55,7 @@ pub struct StyledSpan {
 ### Static Widget Structure
 
 ```rust
+use std::cell::RefCell;
 use crate::reactive::{Reactive, ReactiveFlags, WidgetRefreshState};
 
 /// A widget for displaying static content with optional markup parsing.
@@ -85,7 +86,8 @@ pub struct Static {
 
     // === Internal State ===
     /// Cached visual representation (lazy-evaluated).
-    visual_cache: Option<StyledContent>,
+    /// Uses RefCell for interior mutability in render().
+    visual_cache: RefCell<Option<StyledContent>>,
 
     /// Refresh state for reactive updates.
     refresh_state: WidgetRefreshState,
@@ -98,7 +100,7 @@ impl Default for Static {
             expand: false,
             shrink: false,
             markup: true,  // Default: markup enabled (matches Python)
-            visual_cache: None,
+            visual_cache: RefCell::new(None),
             refresh_state: WidgetRefreshState::new(),
         }
     }
@@ -150,7 +152,7 @@ impl Static {
     /// * `layout` - If true, also triggers layout recalculation (default: true)
     pub fn update(&mut self, content: impl Into<ContentType>, layout: bool) {
         self.content = content.into();
-        self.visual_cache = None;  // Invalidate cache
+        *self.visual_cache.borrow_mut() = None;  // Invalidate cache
 
         if layout {
             self.refresh_state.mark_refresh(ReactiveFlags::layout());
@@ -171,11 +173,12 @@ impl Static {
 ```rust
 impl Static {
     /// Get or create the visual representation for rendering.
-    fn visual(&mut self) -> &StyledContent {
-        if self.visual_cache.is_none() {
-            self.visual_cache = Some(self.visualize());
+    /// Uses interior mutability for lazy caching with &self.
+    fn visual(&self) -> std::cell::Ref<'_, StyledContent> {
+        if self.visual_cache.borrow().is_none() {
+            *self.visual_cache.borrow_mut() = Some(self.visualize());
         }
-        self.visual_cache.as_ref().unwrap()
+        std::cell::Ref::map(self.visual_cache.borrow(), |o| o.as_ref().unwrap())
     }
 
     /// Convert content to styled content for rendering.
@@ -205,15 +208,8 @@ impl Static {
 ```rust
 impl Widget for Static {
     fn render(&self, area: Rect, frame: &mut Frame) {
-        // Use cached visual or create if needed
-        let styled = match &self.visual_cache {
-            Some(v) => v,
-            None => {
-                // Note: We need interior mutability here, or render takes &mut self
-                // For now, recompute on each render if not cached
-                &self.visualize()
-            }
-        };
+        // Use cached visual (lazy-evaluated via interior mutability)
+        let styled = self.visual();
 
         // Convert to ratatui spans
         let spans: Vec<Span> = styled.spans.iter()
@@ -225,8 +221,18 @@ impl Widget for Static {
     }
 
     fn layout(&self) -> LayoutHints {
-        LayoutHints::new()
-            .with_height(Constraint::Auto)  // height: auto (from DEFAULT_CSS)
+        let mut hints = LayoutHints::new()
+            .with_height(Constraint::Auto);  // height: auto (from DEFAULT_CSS)
+
+        // Handle expand/shrink (see Design Decisions section)
+        if self.expand {
+            hints = hints.with_width(Constraint::Fill(1));
+        }
+        if self.shrink {
+            hints = hints.with_can_shrink(true);
+        }
+
+        hints
     }
 
     fn focusable(&self) -> bool {
@@ -357,8 +363,68 @@ impl Link {
    - Layout calculations
    - Reactive property changes
 
-## Open Questions
+## Design Decisions (Resolved Questions)
 
-1. **Interior Mutability**: Should `visual_cache` use `RefCell` for lazy evaluation in render()?
-2. **Markup Parser**: Implement full Rich markup or subset for MVP?
-3. **expand/shrink**: How do these interact with the layout system?
+### 1. Interior Mutability for visual_cache
+
+**Decision**: Use `RefCell<Option<StyledContent>>` for `visual_cache`.
+
+**Rationale**: The Widget trait's `render()` method takes `&self`, requiring interior mutability for lazy caching. Using `RefCell` allows us to:
+- Cache computed visuals on first render
+- Invalidate cache when content changes via `update()`
+- Avoid recomputation on subsequent renders
+
+```rust
+visual_cache: RefCell<Option<StyledContent>>,
+
+fn visual(&self) -> Ref<'_, StyledContent> {
+    if self.visual_cache.borrow().is_none() {
+        *self.visual_cache.borrow_mut() = Some(self.visualize());
+    }
+    Ref::map(self.visual_cache.borrow(), |o| o.as_ref().unwrap())
+}
+```
+
+### 2. Markup Parser Scope
+
+**Decision**: Implement a **subset of Rich markup** for MVP.
+
+**MVP Tags**:
+- `[bold]`, `[b]` - Bold
+- `[italic]`, `[i]` - Italic
+- `[underline]`, `[u]` - Underline
+- Color names: `[red]`, `[green]`, `[blue]`, `[yellow]`, `[cyan]`, `[magenta]`, `[white]`, `[black]`
+- Background: `[on red]`, `[on green]`, etc.
+- Close tags: `[/]`, `[/bold]`, `[/italic]`, etc.
+
+**Deferred to later**:
+- Hex colors (`[#ff0000]`)
+- RGB colors (`[rgb(255,0,0)]`)
+- Style combinations (`[bold red on white]`)
+- Links, emoji, and advanced features
+
+### 3. expand/shrink Layout Interaction
+
+**Decision**: `expand` and `shrink` modify the widget's size constraints.
+
+| Property | Effect on Layout |
+|----------|------------------|
+| `expand=false, shrink=false` (default) | Natural content size |
+| `expand=true` | Expand to fill available space (like `width: 1fr`) |
+| `shrink=true` | Shrink to fit container, truncating if needed |
+| `expand=true, shrink=true` | Fill space but allow shrinking below natural size |
+
+```rust
+fn layout(&self) -> LayoutHints {
+    let mut hints = LayoutHints::new().with_height(Constraint::Auto);
+
+    if self.expand {
+        hints = hints.with_width(Constraint::Fill(1));
+    }
+    if self.shrink {
+        hints = hints.with_can_shrink(true);
+    }
+
+    hints
+}
+```
