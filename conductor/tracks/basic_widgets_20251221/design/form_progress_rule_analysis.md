@@ -116,10 +116,14 @@ def __init__(
 def __init__(self, value=False, ...):
     ...
     if value:
-        # Use set_reactive to avoid emitting Changed on init
-        self.set_reactive(Switch._slider_position, 1.0)
+        self._slider_position = 1.0  # Direct assignment, no watcher
+        self.set_reactive(Switch.value, value)  # Avoids firing watch_value
 ```
-**Important:** When `value=True` is passed to the constructor, `_slider_position` is set to 1.0 directly using `set_reactive()` to avoid triggering the watcher and emitting Changed. The Rust port must NOT emit Changed or animate when setting initial value.
+**Important:** When `value=True` is passed to the constructor:
+1. `_slider_position` is set to 1.0 via direct assignment
+2. `set_reactive(Switch.value, value)` sets the value WITHOUT triggering `watch_value`
+
+The Rust port must NOT emit Changed or animate when setting initial value.
 
 ### Animation
 ```python

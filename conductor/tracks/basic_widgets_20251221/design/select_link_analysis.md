@@ -80,12 +80,15 @@ def __init__(
 ```
 
 ### Initialization Behavior
-After mounting, OptionList auto-highlights the first option if options exist:
+During `__init__`, after adding options, OptionList auto-highlights the first option:
 ```python
-def on_mount(self) -> None:
+def __init__(self, *content, ...):
+    ...
+    self.add_options(content)
     if self.option_count:
-        self.action_first()  # Highlights first option
+        self.action_first()  # Highlights first option during init
 ```
+**Note:** `action_first()` is called in `__init__` (not `on_mount`). `on_mount` only updates line caches.
 
 ### Reactive Properties
 - `highlighted: reactive[int | None]` - Currently highlighted option index
@@ -202,10 +205,13 @@ class NoSelection:
 BLANK = NoSelection()  # Select.BLANK
 ```
 
-### Reactive Properties
-- `value: reactive[SelectType | NoSelection]` - Selected value or BLANK
-- `expanded: reactive[bool] = False` - Dropdown open state
-- `prompt: reactive[str] = "Select"` - Default prompt text
+### Properties (var, not reactive)
+```python
+value: var[SelectType | NoSelection] = var(BLANK, init=False)  # No watcher on init
+expanded: var[bool] = var(False, init=False)                    # No watcher on init
+prompt: var[str] = var("Select")                                # Has watcher
+```
+**Note:** These are `var` (not `reactive`). `value` and `expanded` use `init=False` to prevent watchers firing during initialization.
 
 ### Constructor
 ```python
