@@ -54,11 +54,24 @@ variant: Option<LabelVariant>,  // reactive (applies CSS class)
 ### Button
 ```rust
 label: String,                  // reactive → watch_label (updates render)
-variant: ButtonVariant,         // reactive → watch_variant (updates CSS class)
-disabled: bool,                 // reactive (toggles -disabled class)
+variant: ButtonVariant,         // reactive → watch_variant (updates CSS class -primary/-success/etc)
+disabled: bool,                 // reactive (Widget base handles :disabled pseudo-class)
 compact: bool,                  // reactive (toggles -textual-compact class)
-flat: bool,                     // reactive (toggles -flat class)
+flat: bool,                     // reactive → watch_flat (toggles -style-flat/-style-default classes)
 ```
+
+**Critical: flat style class toggle:**
+```rust
+impl Button {
+    fn watch_flat(&mut self, flat: bool) {
+        // Python uses -style-flat / -style-default, NOT -flat / -default
+        self.set_class(flat, "-style-flat");
+        self.set_class(!flat, "-style-default");
+    }
+}
+```
+
+**Note:** The `disabled` property is handled by the Widget base class which applies the `:disabled` pseudo-class. There is no `-disabled` class toggle.
 
 ### Input
 ```rust
@@ -260,9 +273,9 @@ impl ToggleButton {
 
 | Widget | Property | Class Toggled |
 |--------|----------|---------------|
-| Button | variant | `-primary` / `-success` / `-warning` / `-error` |
+| Button | variant | `-primary` / `-success` / `-warning` / `-error` / `-default` |
 | Button | compact | `-textual-compact` |
-| Button | flat | `-flat` |
+| Button | flat | `-style-flat` / `-style-default` (mutually exclusive) |
 | ToggleButton | value | `-on` |
 | Switch | _slider_position (==1.0) | `-on` |
 | Header | tall | `-tall` |

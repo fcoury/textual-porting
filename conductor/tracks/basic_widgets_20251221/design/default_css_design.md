@@ -156,77 +156,172 @@ Label.accent {
 
 ### Button
 ```css
+/* Base Button styles (exact Python Textual parity) */
 Button {
-    background: $primary;
-    color: $text-primary;
-    border: tall $border;
-    height: 3;
+    width: auto;
     min-width: 16;
+    height: auto;
+    line-pad: 1;
     text-align: center;
     content-align: center middle;
-    padding: 0 2;
 }
-Button:hover {
-    background: $primary-darken-1;
-    border: tall $border-hover;
-}
-Button:focus {
+
+/* ===== FLAT STYLE (-style-flat) ===== */
+Button.-style-flat {
     text-style: bold;
-}
-Button.-active {
-    background: $primary-darken-2;
-    tint: $foreground 30%;
-}
-Button.-textual-compact {
-    height: 1;
-    border: none;
-    padding: 0 1;
-}
-/* Flat style removes border/background, shows only on hover */
-Button.-flat {
-    background: transparent;
-    border: none;
-}
-Button.-flat:hover {
+    color: auto 90%;
     background: $surface;
+    border: block $surface;
 }
-/* Default variant (no explicit variant) */
-Button.-default {
-    background: $surface;
-    color: $foreground;
-    border: tall $border;
-}
-Button.-default:hover {
-    background: $surface-lighten-1;
-}
-/* Variant styles */
-Button.-primary {
+Button.-style-flat:hover {
     background: $primary;
+    border: block $primary;
+}
+Button.-style-flat:focus {
+    text-style: $button-focus-text-style;
+}
+Button.-style-flat.-active {
+    background: $surface;
+    border: block $surface;
+    tint: $background 30%;
+}
+Button.-style-flat:disabled {
+    color: auto 50%;
+}
+/* Flat style variants */
+Button.-style-flat.-primary {
+    background: $primary-muted;
+    border: block $primary-muted;
     color: $text-primary;
 }
-Button.-primary:hover {
-    background: $primary-darken-1;
+Button.-style-flat.-primary:hover {
+    color: $text;
+    background: $primary;
+    border: block $primary;
 }
-Button.-success {
-    background: $success;
+Button.-style-flat.-success {
+    background: $success-muted;
+    border: block $success-muted;
     color: $text-success;
 }
-Button.-success:hover {
-    background: $success-darken-1;
+Button.-style-flat.-success:hover {
+    color: $text;
+    background: $success;
+    border: block $success;
 }
-Button.-warning {
-    background: $warning;
+Button.-style-flat.-warning {
+    background: $warning-muted;
+    border: block $warning-muted;
     color: $text-warning;
 }
-Button.-warning:hover {
-    background: $warning-darken-1;
+Button.-style-flat.-warning:hover {
+    color: $text;
+    background: $warning;
+    border: block $warning;
 }
-Button.-error {
-    background: $error;
+Button.-style-flat.-error {
+    background: $error-muted;
+    border: block $error-muted;
     color: $text-error;
 }
-Button.-error:hover {
+Button.-style-flat.-error:hover {
+    color: $text;
+    background: $error;
+    border: block $error;
+}
+
+/* ===== DEFAULT STYLE (-style-default) - 3D appearance ===== */
+Button.-style-default {
+    text-style: bold;
+    color: $button-foreground;
+    background: $surface;
+    border: none;
+    border-top: tall $surface-lighten-1;
+    border-bottom: tall $surface-darken-1;
+}
+Button.-style-default.-textual-compact {
+    border: none !important;
+}
+Button.-style-default:disabled {
+    text-opacity: 0.6;
+}
+Button.-style-default:focus {
+    text-style: $button-focus-text-style;
+    background-tint: $foreground 5%;
+}
+Button.-style-default:hover {
+    border-top: tall $surface;
+    background: $surface-darken-1;
+}
+Button.-style-default.-active {
+    background: $surface;
+    border-bottom: tall $surface-lighten-1;
+    border-top: tall $surface-darken-1;
+    tint: $background 30%;
+}
+/* Default style -primary variant */
+Button.-style-default.-primary {
+    color: $button-color-foreground;
+    background: $primary;
+    border-top: tall $primary-lighten-3;
+    border-bottom: tall $primary-darken-3;
+}
+Button.-style-default.-primary:hover {
+    background: $primary-darken-2;
+    border-top: tall $primary;
+}
+Button.-style-default.-primary.-active {
+    background: $primary;
+    border-bottom: tall $primary-lighten-3;
+    border-top: tall $primary-darken-3;
+}
+/* Default style -success variant */
+Button.-style-default.-success {
+    color: $button-color-foreground;
+    background: $success;
+    border-top: tall $success-lighten-2;
+    border-bottom: tall $success-darken-3;
+}
+Button.-style-default.-success:hover {
+    background: $success-darken-2;
+    border-top: tall $success;
+}
+Button.-style-default.-success.-active {
+    background: $success;
+    border-bottom: tall $success-lighten-2;
+    border-top: tall $success-darken-2;
+}
+/* Default style -warning variant */
+Button.-style-default.-warning {
+    color: $button-color-foreground;
+    background: $warning;
+    border-top: tall $warning-lighten-2;
+    border-bottom: tall $warning-darken-3;
+}
+Button.-style-default.-warning:hover {
+    background: $warning-darken-2;
+    border-top: tall $warning;
+}
+Button.-style-default.-warning.-active {
+    background: $warning;
+    border-bottom: tall $warning-lighten-2;
+    border-top: tall $warning-darken-2;
+}
+/* Default style -error variant */
+Button.-style-default.-error {
+    color: $button-color-foreground;
+    background: $error;
+    border-top: tall $error-lighten-2;
+    border-bottom: tall $error-darken-3;
+}
+Button.-style-default.-error:hover {
     background: $error-darken-1;
+    border-top: tall $error;
+}
+Button.-style-default.-error.-active {
+    background: $error;
+    border-bottom: tall $error-lighten-2;
+    border-top: tall $error-darken-2;
 }
 ```
 
@@ -398,20 +493,30 @@ Link:focus {
 
 The DEFAULT_CSS uses these theme variables that must be defined:
 
-### Colors
-- `$primary`, `$primary-darken-1`, `$primary-darken-2`
+### Base Colors
+- `$primary`, `$primary-lighten-3`, `$primary-darken-2`, `$primary-darken-3`
 - `$secondary`
-- `$success`, `$warning`, `$error`
-- `$surface`, `$panel`
+- `$success`, `$success-lighten-2`, `$success-darken-2`, `$success-darken-3`
+- `$warning`, `$warning-lighten-2`, `$warning-darken-2`, `$warning-darken-3`
+- `$error`, `$error-lighten-2`, `$error-darken-1`, `$error-darken-3`
+- `$surface`, `$surface-lighten-1`, `$surface-darken-1`, `$surface-darken-2`, `$panel`
 - `$foreground`, `$background`
 - `$border`, `$border-blurred`
 - `$accent`
+- `$text` (general text color)
 
-### Semantic Colors
+### Button-specific
+- `$button-foreground` - Default style text color
+- `$button-color-foreground` - Variant text color (primary/success/etc)
+- `$button-focus-text-style` - Text style on focus
+
+### Semantic Text Colors
 - `$text-primary`, `$text-secondary`, `$text-accent`
 - `$text-success`, `$text-warning`, `$text-error`
-- `$success-muted`, `$warning-muted`, `$error-muted`
+
+### Muted Colors (for flat button variants)
 - `$primary-muted`, `$secondary-muted`, `$accent-muted`
+- `$success-muted`, `$warning-muted`, `$error-muted`
 
 ### Footer-specific
 - `$footer-foreground`, `$footer-background`

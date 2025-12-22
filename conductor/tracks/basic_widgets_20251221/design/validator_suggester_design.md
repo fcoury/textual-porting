@@ -54,38 +54,32 @@ impl ValidationResult {
 ### Failure
 
 ```rust
+use std::sync::Arc;
+
 /// A single validation failure.
 ///
-/// Note: Python Textual's Failure stores a reference to the actual validator.
-/// In Rust, we store the validator as a trait object to match this behavior.
+/// Matches Python Textual's Failure dataclass exactly:
+/// - Stores a reference to the actual validator (via Arc)
+/// - Uses validator.describe_failure() if no explicit description
+/// - Uses validator.failure_description as fallback
 #[derive(Debug, Clone)]
 pub struct Failure {
-    /// The validator that produced this failure (as trait object name for display).
-    /// In Python, this is `validator: Validator | None`. We use the type name.
-    pub validator_name: String,
+    /// The validator that produced this failure.
+    /// In Python: `validator: Validator | None`
+    pub validator: Arc<dyn Validator>,
     /// The value that failed validation.
     pub value: Option<String>,
-    /// Human-readable description of the failure.
-    pub description: Option<String>,
+    /// Human-readable description of the failure (explicit override).
+    description_override: Option<String>,
 }
 
 impl Failure {
     /// Create a failure from a validator instance.
-    /// Extracts the validator's name for the failure record.
-    pub fn from_validator<V: Validator + ?Sized>(validator: &V) -> Self {
+    pub fn new(validator: Arc<dyn Validator>) -> Self {
         Self {
-            validator_name: validator.name().to_string(),
+            validator,
             value: None,
-            description: None,
-        }
-    }
-
-    /// Create a failure with just a name (for cases where validator ref isn't available).
-    pub fn new(validator_name: impl Into<String>) -> Self {
-        Self {
-            validator_name: validator_name.into(),
-            value: None,
-            description: None,
+            description_override: None,
         }
     }
 
@@ -95,8 +89,30 @@ impl Failure {
     }
 
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
+        self.description_override = Some(description.into());
         self
+    }
+
+    /// Get the failure description.
+    /// Priority: explicit override > validator.failure_description > validator.describe_failure
+    pub fn description(&self) -> Option<String> {
+        // 1. Explicit override takes precedence
+        if let Some(ref desc) = self.description_override {
+            return Some(desc.clone());
+        }
+
+        // 2. Check validator's static failure_description
+        if let Some(desc) = self.validator.failure_description() {
+            return Some(desc);
+        }
+
+        // 3. Fall back to dynamic describe_failure
+        self.validator.describe_failure(self)
+    }
+
+    /// Get the validator's name.
+    pub fn validator_name(&self) -> &str {
+        self.validator.name()
     }
 }
 ```
@@ -108,18 +124,37 @@ impl Failure {
 ///
 /// Validators are used to check if input values meet certain criteria.
 /// Multiple validators can be applied to a single Input widget.
+///
+/// Note: Validators are stored as Arc<dyn Validator> so Failure can reference them.
 pub trait Validator: Send + Sync + std::fmt::Debug {
     /// Validate the given value.
-    fn validate(&self, value: &str) -> ValidationResult;
+    /// Implementations should use `self.make_failure()` to create failures.
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult;
 
     /// Returns the name of this validator (for failure messages).
     fn name(&self) -> &str;
 
-    /// Returns a description of what this validator checks.
-    fn describe(&self) -> Option<String> {
+    /// Static failure description (used if describe_failure returns None).
+    fn failure_description(&self) -> Option<String> {
+        None
+    }
+
+    /// Dynamic failure description based on the specific failure.
+    /// Override this for context-aware error messages.
+    fn describe_failure(&self, failure: &Failure) -> Option<String> {
         None
     }
 }
+
+/// Extension trait for creating failures with self-reference.
+pub trait ValidatorExt: Validator + Sized + 'static {
+    /// Create a failure that references this validator.
+    fn make_failure(self: &Arc<Self>) -> Failure {
+        Failure::new(self.clone())
+    }
+}
+
+impl<T: Validator + 'static> ValidatorExt for T {}
 ```
 
 ### Built-in Validators
@@ -151,13 +186,13 @@ impl Integer {
 }
 
 impl Validator for Integer {
-    fn validate(&self, value: &str) -> ValidationResult {
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult {
         match value.parse::<i64>() {
             Ok(n) => {
                 if let Some(min) = self.minimum {
                     if n < min {
                         return ValidationResult::failure(vec![
-                            Failure::from_validator(self)
+                            self.make_failure()
                                 .with_value(value)
                                 .with_description(format!("Value must be at least {}", min))
                         ]);
@@ -166,7 +201,7 @@ impl Validator for Integer {
                 if let Some(max) = self.maximum {
                     if n > max {
                         return ValidationResult::failure(vec![
-                            Failure::from_validator(self)
+                            self.make_failure()
                                 .with_value(value)
                                 .with_description(format!("Value must be at most {}", max))
                         ]);
@@ -175,7 +210,7 @@ impl Validator for Integer {
                 ValidationResult::success()
             }
             Err(_) => ValidationResult::failure(vec![
-                Failure::from_validator(self)
+                self.make_failure()
                     .with_value(value)
                     .with_description("Must be a valid integer")
             ]),
@@ -195,13 +230,13 @@ pub struct Number {
 }
 
 impl Validator for Number {
-    fn validate(&self, value: &str) -> ValidationResult {
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult {
         match value.parse::<f64>() {
             Ok(n) => {
                 if let Some(min) = self.minimum {
                     if n < min {
                         return ValidationResult::failure(vec![
-                            Failure::from_validator(self)
+                            self.make_failure()
                                 .with_value(value)
                                 .with_description(format!("Value must be at least {}", min))
                         ]);
@@ -210,7 +245,7 @@ impl Validator for Number {
                 if let Some(max) = self.maximum {
                     if n > max {
                         return ValidationResult::failure(vec![
-                            Failure::from_validator(self)
+                            self.make_failure()
                                 .with_value(value)
                                 .with_description(format!("Value must be at most {}", max))
                         ]);
@@ -219,7 +254,7 @@ impl Validator for Number {
                 ValidationResult::success()
             }
             Err(_) => ValidationResult::failure(vec![
-                Failure::from_validator(self)
+                self.make_failure()
                     .with_value(value)
                     .with_description("Must be a valid number")
             ]),
@@ -241,14 +276,14 @@ pub struct Length {
 }
 
 impl Validator for Length {
-    fn validate(&self, value: &str) -> ValidationResult {
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult {
         let len = value.chars().count();
         let mut failures = Vec::new();
 
         if let Some(min) = self.minimum {
             if len < min {
                 failures.push(
-                    Failure::from_validator(self)
+                    self.make_failure()
                         .with_value(value)
                         .with_description(format!("Must be at least {} characters", min))
                 );
@@ -258,7 +293,7 @@ impl Validator for Length {
         if let Some(max) = self.maximum {
             if len > max {
                 failures.push(
-                    Failure::from_validator(self)
+                    self.make_failure()
                         .with_value(value)
                         .with_description(format!("Must be at most {} characters", max))
                 );
@@ -294,12 +329,12 @@ impl Regex {
 }
 
 impl Validator for Regex {
-    fn validate(&self, value: &str) -> ValidationResult {
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult {
         if self.pattern.is_match(value) {
             ValidationResult::success()
         } else {
             ValidationResult::failure(vec![
-                Failure::from_validator(self)
+                self.make_failure()
                     .with_value(value)
                     .with_description(&self.description)
             ])
@@ -316,12 +351,12 @@ impl Validator for Regex {
 pub struct Url;
 
 impl Validator for Url {
-    fn validate(&self, value: &str) -> ValidationResult {
+    fn validate(self: Arc<Self>, value: &str) -> ValidationResult {
         // Use url crate for validation
         match url::Url::parse(value) {
             Ok(_) => ValidationResult::success(),
             Err(_) => ValidationResult::failure(vec![
-                Failure::from_validator(self)
+                self.make_failure()
                     .with_value(value)
                     .with_description("Must be a valid URL")
             ]),
@@ -384,25 +419,92 @@ impl Input {
 
 ## Suggestion System
 
-### Suggester Trait
+### Suggester Base (Python Parity Design)
+
+Python's `Suggester` is an ABC with built-in caching and case normalization in `_get_suggestion`.
+In Rust, we model this with a base struct that wraps the custom logic.
 
 ```rust
+use lru::LruCache;
+use std::num::NonZeroUsize;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-/// Trait for input suggesters (autocomplete providers).
-///
-/// Suggesters provide completion suggestions based on the current input value.
-/// They are async to support network-based suggestions.
+/// Trait for custom suggestion logic.
+/// Implementors only need to provide the core suggestion logic.
+/// Normalization and caching are handled by `Suggester`.
 #[async_trait]
-pub trait Suggester: Send + Sync + std::fmt::Debug {
+pub trait SuggesterImpl: Send + Sync + std::fmt::Debug {
     /// Get a suggestion for the given value.
-    ///
-    /// Returns `None` if no suggestion is available.
+    /// Note: The value is already normalized (casefolded if not case_sensitive).
     async fn get_suggestion(&self, value: &str) -> Option<String>;
+}
 
-    /// Whether the suggester is case-sensitive.
-    fn case_sensitive(&self) -> bool {
-        false
+/// Base suggester with built-in caching and normalization.
+/// Matches Python Textual's Suggester architecture.
+#[derive(Debug)]
+pub struct Suggester<T: SuggesterImpl> {
+    inner: T,
+    /// LRU cache for suggestions (None = caching disabled).
+    cache: Option<Mutex<LruCache<String, Option<String>>>>,
+    /// Whether matching is case-sensitive.
+    /// If false, values are casefolded before calling get_suggestion.
+    case_sensitive: bool,
+}
+
+impl<T: SuggesterImpl> Suggester<T> {
+    /// Create a new Suggester.
+    ///
+    /// Args:
+    ///   impl_: The custom suggestion implementation
+    ///   use_cache: Whether to cache suggestions (default: true in Python)
+    ///   case_sensitive: If false, normalize values before lookup (default: false in Python)
+    pub fn new(impl_: T, use_cache: bool, case_sensitive: bool) -> Self {
+        Self {
+            inner: impl_,
+            cache: if use_cache {
+                Some(Mutex::new(LruCache::new(NonZeroUsize::new(1024).unwrap())))
+            } else {
+                None
+            },
+            case_sensitive,
+        }
+    }
+
+    /// Internal method called by widgets to get suggestions.
+    /// Handles normalization and caching (matches Python's _get_suggestion).
+    pub async fn request_suggestion(&self, requester: WidgetId, value: &str) -> Option<SuggestionReady> {
+        // Normalize value if not case sensitive
+        let normalized_value = if self.case_sensitive {
+            value.to_string()
+        } else {
+            value.to_lowercase()  // casefold equivalent
+        };
+
+        // Check cache first
+        if let Some(ref cache_mutex) = self.cache {
+            let mut cache = cache_mutex.lock().unwrap();
+            if let Some(cached) = cache.get(&normalized_value) {
+                return cached.as_ref().map(|s| SuggestionReady {
+                    value: value.to_string(),
+                    suggestion: s.clone(),
+                });
+            }
+        }
+
+        // Get from implementation
+        let suggestion = self.inner.get_suggestion(&normalized_value).await;
+
+        // Cache the result
+        if let Some(ref cache_mutex) = self.cache {
+            let mut cache = cache_mutex.lock().unwrap();
+            cache.put(normalized_value, suggestion.clone());
+        }
+
+        suggestion.map(|s| SuggestionReady {
+            value: value.to_string(),
+            suggestion: s,
+        })
     }
 }
 ```
@@ -411,106 +513,60 @@ pub trait Suggester: Send + Sync + std::fmt::Debug {
 
 ```rust
 /// A suggester that provides suggestions from a fixed list.
-///
-/// Note: Python Textual defaults `case_sensitive=True`.
+/// Implements only the core logic; caching/normalization handled by Suggester.
 #[derive(Debug, Clone)]
-pub struct SuggestFromList {
+pub struct SuggestFromListImpl {
     /// The list of possible suggestions.
     suggestions: Vec<String>,
-    /// Whether matching is case-sensitive (default: true, matches Python).
-    case_sensitive: bool,
 }
 
-impl SuggestFromList {
+impl SuggestFromListImpl {
     pub fn new(suggestions: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             suggestions: suggestions.into_iter().map(Into::into).collect(),
-            case_sensitive: true,  // Python default is True
         }
-    }
-
-    pub fn case_sensitive(mut self, case_sensitive: bool) -> Self {
-        self.case_sensitive = case_sensitive;
-        self
     }
 }
 
 #[async_trait]
-impl Suggester for SuggestFromList {
+impl SuggesterImpl for SuggestFromListImpl {
     async fn get_suggestion(&self, value: &str) -> Option<String> {
         if value.is_empty() {
             return None;
         }
 
-        let compare = |s: &str, prefix: &str| {
-            if self.case_sensitive {
-                s.starts_with(prefix)
-            } else {
-                s.to_lowercase().starts_with(&prefix.to_lowercase())
-            }
-        };
-
+        // Note: value is already normalized by Suggester if case_sensitive=false
         self.suggestions
             .iter()
-            .find(|s| compare(s, value))
+            .find(|s| s.to_lowercase().starts_with(value))
             .cloned()
     }
-
-    fn case_sensitive(&self) -> bool {
-        self.case_sensitive
-    }
-}
-```
-
-### Suggestion Caching
-
-```rust
-use lru::LruCache;
-use std::num::NonZeroUsize;
-
-/// A cached suggester wrapper.
-#[derive(Debug)]
-pub struct CachedSuggester<S: Suggester> {
-    inner: S,
-    cache: std::sync::Mutex<LruCache<String, Option<String>>>,
 }
 
-impl<S: Suggester> CachedSuggester<S> {
-    pub fn new(suggester: S, cache_size: usize) -> Self {
-        Self {
-            inner: suggester,
-            cache: std::sync::Mutex::new(
-                LruCache::new(NonZeroUsize::new(cache_size).unwrap())
-            ),
-        }
-    }
-}
+/// Convenience type alias matching Python's SuggestFromList.
+pub type SuggestFromList = Suggester<SuggestFromListImpl>;
 
-#[async_trait]
-impl<S: Suggester> Suggester for CachedSuggester<S> {
-    async fn get_suggestion(&self, value: &str) -> Option<String> {
-        // Check cache first
-        {
-            let mut cache = self.cache.lock().unwrap();
-            if let Some(cached) = cache.get(value) {
-                return cached.clone();
-            }
-        }
-
-        // Get from inner suggester
-        let result = self.inner.get_suggestion(value).await;
-
-        // Cache the result
-        {
-            let mut cache = self.cache.lock().unwrap();
-            cache.put(value.to_string(), result.clone());
-        }
-
-        result
+impl SuggestFromList {
+    /// Create a SuggestFromList with Python-compatible defaults.
+    /// use_cache=true, case_sensitive=false (Python defaults).
+    pub fn from_list(suggestions: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Suggester::new(
+            SuggestFromListImpl::new(suggestions),
+            true,   // use_cache
+            false,  // case_sensitive (Python default is False)
+        )
     }
 
-    fn case_sensitive(&self) -> bool {
-        self.inner.case_sensitive()
+    /// Create with explicit case sensitivity.
+    pub fn from_list_case_sensitive(
+        suggestions: impl IntoIterator<Item = impl Into<String>>,
+        case_sensitive: bool,
+    ) -> Self {
+        Suggester::new(
+            SuggestFromListImpl::new(suggestions),
+            true,
+            case_sensitive,
+        )
     }
 }
 ```
@@ -554,13 +610,12 @@ impl Input {
     }
 
     /// Request a suggestion for the current value.
+    /// Called internally when the input value changes.
     pub async fn request_suggestion(&self) {
         if let Some(ref suggester) = self.suggester {
-            if let Some(suggestion) = suggester.get_suggestion(&self.value).await {
-                self.post_message(SuggestionReady {
-                    value: self.value.clone(),
-                    suggestion,
-                });
+            // Suggester handles normalization and caching internally
+            if let Some(ready) = suggester.request_suggestion(self.id(), &self.value).await {
+                self.post_message(ready);
             }
         }
     }

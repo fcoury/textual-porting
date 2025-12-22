@@ -87,6 +87,11 @@ impl CheckboxChanged {
     pub fn value(&self) -> bool {
         self.inner.value
     }
+
+    /// Alias for checkbox (common Textual pattern).
+    pub fn control(&self) -> WidgetRef<Checkbox> {
+        self.checkbox()
+    }
 }
 
 impl Message for CheckboxChanged {}
@@ -108,6 +113,11 @@ impl RadioButtonChanged {
 
     pub fn value(&self) -> bool {
         self.inner.value
+    }
+
+    /// Alias for radio_button (common Textual pattern).
+    pub fn control(&self) -> WidgetRef<RadioButton> {
+        self.radio_button()
     }
 }
 
@@ -141,6 +151,13 @@ pub struct SwitchChanged {
     pub switch: WidgetRef<Switch>,
     /// The new value.
     pub value: bool,
+}
+
+impl SwitchChanged {
+    /// Alias for switch (common Textual pattern).
+    pub fn control(&self) -> &WidgetRef<Switch> {
+        &self.switch
+    }
 }
 
 impl Message for SwitchChanged {}
