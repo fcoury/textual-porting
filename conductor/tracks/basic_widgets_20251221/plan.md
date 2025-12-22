@@ -30,12 +30,12 @@
 ## Phase 3: Implementation
 
 ### 3.1 Static Widget (Foundation for Label)
-- [ ] Task: Implement Static struct with content property
-- [ ] Task: Implement markup parsing support
-- [ ] Task: Implement expand/shrink properties
-- [ ] Task: Implement update() method
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Static
+- [x] Task: Implement Static struct with content property [0d51b8c]
+- [x] Task: Implement markup parsing support [0d51b8c]
+- [x] Task: Implement expand/shrink properties [0d51b8c]
+- [x] Task: Implement update() method [0d51b8c]
+- [x] Task: Add DEFAULT_CSS [0d51b8c]
+- [x] Task: Write tests for Static [0d51b8c]
 
 ### 3.2 Label Widget (REBUILD - extends Static)
 - [ ] Task: Remove existing Label implementation
