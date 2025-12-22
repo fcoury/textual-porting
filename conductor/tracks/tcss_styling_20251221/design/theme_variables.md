@@ -264,18 +264,29 @@ impl ColorSystem {
         });
         vars.insert("surface".into(), surface.to_css());
 
-        // Panel defaults to surface
-        let panel = self.panel.clone().unwrap_or(surface.clone());
+        // Boost: contrast_text(background).with_alpha(0.04)
+        let boost = self.boost.clone().unwrap_or_else(|| {
+            self.contrast_text(&self.background).with_alpha(0.04)
+        });
+        vars.insert("boost".into(), boost.to_css());
+
+        // Panel: in dark mode = surface.blend(primary, 0.1) + boost, else surface
+        let panel = self.panel.clone().unwrap_or_else(|| {
+            if self.dark {
+                // Python: surface.blend(primary, 0.1) then adds boost overlay
+                surface.blend(&self.primary, 0.1).blend(&boost, boost.a)
+            } else {
+                surface.clone()
+            }
+        });
         vars.insert("panel".into(), panel.to_css());
 
-        if let Some(ref c) = self.boost {
-            vars.insert("boost".into(), c.to_css());
-        }
-
-        // Text colors (Python uses auto % on background, simplified here)
-        vars.insert("text".into(), self.foreground.with_alpha(self.text_alpha).to_css());
-        vars.insert("text-muted".into(), self.foreground.with_alpha(0.6).to_css());
-        vars.insert("text-disabled".into(), self.foreground.with_alpha(0.4).to_css());
+        // Text colors: "auto 87%/60%/38%" - uses background's contrast text with alpha
+        // Python: auto_color(self.background, alpha)
+        let text_base = self.contrast_text(&self.background);
+        vars.insert("text".into(), text_base.with_alpha(0.87).to_css());
+        vars.insert("text-muted".into(), text_base.with_alpha(0.60).to_css());
+        vars.insert("text-disabled".into(), text_base.with_alpha(0.38).to_css());
 
         // Contrast text for colored backgrounds
         // Python: text-{color} = contrast_text.tint(color.with_alpha(0.66))
@@ -295,6 +306,7 @@ impl ColorSystem {
     }
 
     /// Add color with lighten/darken shades, background, and muted variants
+    /// Matches Python ColorSystem._get_shades() logic
     fn add_color_shades(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
         // Base color
         vars.insert(name.into(), color.to_css());
@@ -313,27 +325,35 @@ impl ColorSystem {
             vars.insert(format!("{}-darken-{}", name, i), shade.to_css());
         }
 
-        // Background variant (blended with theme background)
-        let bg = color.blend(&self.background, 0.85);
+        // Background variant: Python uses different logic for dark/light themes
+        // Dark: color darkened by 2*spread, then blended 85% toward background
+        // Light: color blended 85% toward background directly
+        let bg = if self.dark {
+            let darkened = color.darken(self.luminosity_spread * 2.0);
+            darkened.blend(&self.background, 0.85)
+        } else {
+            color.blend(&self.background, 0.85)
+        };
         vars.insert(format!("{}-background", name), bg.to_css());
 
-        // Muted variant (reduced saturation/opacity for subtle use)
+        // Muted variant: color with reduced alpha for subtle backgrounds
         let muted = color.with_alpha(0.3);
         vars.insert(format!("{}-muted", name), muted.to_css());
     }
 
     /// Get base contrasting text color for a background (matches Python's get_contrast_text)
+    /// Uses brightness < 0.5 threshold (Textual's Color.get_contrast_text)
     fn contrast_text(&self, background: &Color) -> Color {
-        // Calculate relative luminance
-        let luminance = background.luminance();
+        // Calculate brightness (simple RGB average)
+        let brightness = background.brightness();
 
-        // Use WCAG contrast threshold (0.179 is the threshold for 4.5:1 contrast)
-        if luminance > 0.179 {
-            // Light background: use dark text
-            Color::parse("#000000").unwrap().with_alpha(self.text_alpha)
+        // Python uses brightness < 0.5 threshold
+        if brightness < 0.5 {
+            // Dark background: use white text
+            Color::parse("#ffffff").unwrap()
         } else {
-            // Dark background: use light text
-            Color::parse("#ffffff").unwrap().with_alpha(self.text_alpha)
+            // Light background: use black text
+            Color::parse("#000000").unwrap()
         }
     }
 
@@ -359,6 +379,13 @@ pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 239, g: 239, b: 239, a: 
 pub static DEFAULT_LIGHT_SURFACE: Color = Color { r: 245, g: 245, b: 245, a: 1.0 };  // #f5f5f5
 
 impl Color {
+    /// Calculate brightness (0.0 to 1.0)
+    /// Used by get_contrast_text - simple perceived brightness formula
+    pub fn brightness(&self) -> f32 {
+        // Perceived brightness formula (same as Python Textual)
+        (0.299 * self.r as f32 + 0.587 * self.g as f32 + 0.114 * self.b as f32) / 255.0
+    }
+
     /// Calculate relative luminance (for WCAG contrast calculations)
     pub fn luminance(&self) -> f32 {
         // Convert to linear RGB

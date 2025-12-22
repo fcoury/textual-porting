@@ -1012,30 +1012,61 @@ pub struct RefreshFlags {
 }
 
 impl PropertyName {
+    /// Get refresh flags for this property
+    /// Synced with triggers_layout() - any property that triggers layout also refreshes layout here
     pub fn refresh_flags(&self) -> RefreshFlags {
         match self {
-            // Layout-affecting properties
+            // Layout-affecting properties (sync with triggers_layout())
+            // Dimensions
             PropertyName::Width | PropertyName::Height |
             PropertyName::MinWidth | PropertyName::MinHeight |
             PropertyName::MaxWidth | PropertyName::MaxHeight |
-            PropertyName::Margin | PropertyName::Padding |
+            // Box model
+            PropertyName::Margin | PropertyName::MarginTop |
+            PropertyName::MarginRight | PropertyName::MarginBottom |
+            PropertyName::MarginLeft | PropertyName::Padding |
+            PropertyName::PaddingTop | PropertyName::PaddingRight |
+            PropertyName::PaddingBottom | PropertyName::PaddingLeft |
+            PropertyName::Border | PropertyName::BorderTop |
+            PropertyName::BorderRight | PropertyName::BorderBottom |
+            PropertyName::BorderLeft |
+            // Display/positioning
             PropertyName::Display | PropertyName::Dock |
-            PropertyName::Layout | PropertyName::BoxSizing => {
+            PropertyName::Layout | PropertyName::BoxSizing |
+            PropertyName::Overlay |
+            // Text layout
+            PropertyName::LinePad |
+            // Grid
+            PropertyName::GridColumns | PropertyName::GridRows |
+            PropertyName::GridSizeRows | PropertyName::GridSizeColumns |
+            PropertyName::GridGutterHorizontal | PropertyName::GridGutterVertical |
+            PropertyName::ColumnSpan | PropertyName::RowSpan => {
                 RefreshFlags { layout: true, repaint: true, ..Default::default() }
             }
 
-            // Overflow affects scrollbars
+            // Scrollbar layout properties (layout + scrollbars)
+            PropertyName::ScrollbarVisibility |
+            PropertyName::ScrollbarSizeHorizontal | PropertyName::ScrollbarSizeVertical |
+            PropertyName::ScrollbarGutter => {
+                RefreshFlags { layout: true, repaint: true, scrollbars: true, ..Default::default() }
+            }
+
+            // Overflow affects scrollbars but not layout
             PropertyName::Overflow | PropertyName::OverflowX |
             PropertyName::OverflowY => {
                 RefreshFlags { repaint: true, scrollbars: true, ..Default::default() }
             }
 
-            // Scrollbar colors
-            PropertyName::ScrollbarColor | PropertyName::ScrollbarBackgroundColor => {
+            // Scrollbar colors (scrollbars only)
+            PropertyName::ScrollbarColor | PropertyName::ScrollbarColorHover |
+            PropertyName::ScrollbarColorActive |
+            PropertyName::ScrollbarBackgroundColor | PropertyName::ScrollbarBackgroundColorHover |
+            PropertyName::ScrollbarBackgroundColorActive |
+            PropertyName::ScrollbarCornerColor => {
                 RefreshFlags { scrollbars: true, ..Default::default() }
             }
 
-            // Visual-only properties
+            // Visual-only properties (repaint only)
             _ => RefreshFlags { repaint: true, ..Default::default() }
         }
     }
