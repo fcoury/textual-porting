@@ -17,7 +17,7 @@
 - [x] Task: Write technical design document [22415e9]
 - [x] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md) [7a25ad6]
 
-## Phase 3: Implementation
+## Phase 3: Implementation [checkpoint: 0bb0f3f]
 
 ### 3.1 Extended Property Types
 - [x] Task: Implement layout properties (width, height, min-*, max-*) [9a33880]
@@ -68,15 +68,15 @@
 - [x] Task: Implement change notification to widgets [569312c]
 - [x] Task: Write tests for hot reloading [569312c]
 
-- [ ] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [0bb0f3f]
 
-## Phase 4: Testing & Verification
+## Phase 4: Testing & Verification [checkpoint: 0bb0f3f]
 - [x] Task: Create comprehensive property parsing tests [569312c]
 - [x] Task: Create selector matching test suite [569312c]
 - [x] Task: Create animation example app [569312c]
 - [x] Task: Create theme switching example [569312c]
 - [x] Task: Run all tests and fix failures [569312c]
-- [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md) [0bb0f3f]
 
 > **Note:** Phase 4 testing tasks were already completed during Phase 3 implementation.
 > Total tests: 969 (508 style-related tests covering property parsing, selectors,
