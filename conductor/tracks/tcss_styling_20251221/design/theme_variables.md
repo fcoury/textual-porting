@@ -230,14 +230,20 @@ impl ColorSystem {
     pub fn generate_variables(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
 
-        // Primary color shades (with background and muted variants)
+        // Primary color shades - generates:
+        //   primary, primary-lighten-{1,2,3}, primary-darken-{1,2,3},
+        //   primary-background, primary-muted
         self.add_color_shades(&mut vars, "primary", &self.primary);
 
-        // Secondary color (uses fallback if None, so always has a value)
+        // Secondary color (uses fallback if None, so always has a value) - generates:
+        //   secondary, secondary-lighten-{1,2,3}, secondary-darken-{1,2,3},
+        //   secondary-background, secondary-muted
         let secondary = self.secondary.clone().unwrap_or(self.primary.clone());
         self.add_color_shades(&mut vars, "secondary", &secondary);
 
         // Warning, error, success, accent - all have fallbacks so always generate
+        // Each generates: {name}, {name}-lighten-{1,2,3}, {name}-darken-{1,2,3},
+        //                 {name}-background, {name}-muted
         let warning = self.warning.clone().unwrap_or(self.primary.clone());
         self.add_color_shades(&mut vars, "warning", &warning);
 
@@ -281,12 +287,12 @@ impl ColorSystem {
         });
         vars.insert("panel".into(), panel.to_css());
 
-        // Text colors: "auto 87%/60%/38%" - uses background's contrast text with alpha
-        // Python: auto_color(self.background, alpha)
-        let text_base = self.contrast_text(&self.background);
-        vars.insert("text".into(), text_base.with_alpha(0.87).to_css());
-        vars.insert("text-muted".into(), text_base.with_alpha(0.60).to_css());
-        vars.insert("text-disabled".into(), text_base.with_alpha(0.38).to_css());
+        // Text colors: Python emits literal "auto X%" strings, not concrete colors
+        // These get resolved at runtime based on background
+        // (or ansi_default for ANSI color mode)
+        vars.insert("text".into(), "auto 87%".into());
+        vars.insert("text-muted".into(), "auto 60%".into());
+        vars.insert("text-disabled".into(), "auto 38%".into());
 
         // Contrast text for colored backgrounds
         // Python: text-{color} = contrast_text.tint(color.with_alpha(0.66))
