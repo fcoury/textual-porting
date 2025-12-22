@@ -423,9 +423,8 @@ pub enum ScrollbarGutter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScrollbarVisibility {
     #[default]
-    Auto,      // Show when needed
+    Visible,   // Always show (default)
     Hidden,    // Never show
-    Visible,   // Always show
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -446,10 +445,8 @@ pub enum TextOverflow {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Expand {
     #[default]
-    None,      // No expansion
-    Horizontal,
-    Vertical,
-    Both,
+    Greedy,    // Expand greedily to fill available space
+    Optimal,   // Expand to optimal/natural size
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -463,6 +460,7 @@ pub enum Overlay {
 pub enum Constrain {
     #[default]
     None,      // No constraint
+    Inside,    // Constrain to stay inside parent
     Inflect,   // Constrain to inflection point
 }
 ```
@@ -637,37 +635,136 @@ impl PropertyName {
     /// Get expected value type for this property
     pub fn value_type(&self) -> PropertyValueType {
         match self {
+            // Scalar dimensions
             PropertyName::Width | PropertyName::Height |
             PropertyName::MinWidth | PropertyName::MinHeight |
             PropertyName::MaxWidth | PropertyName::MaxHeight => PropertyValueType::Scalar,
 
+            // Spacing (4-sided)
             PropertyName::Margin | PropertyName::Padding => PropertyValueType::Spacing,
 
-            PropertyName::Color | PropertyName::Background |
-            PropertyName::Tint => PropertyValueType::Color,
+            // Individual margins/paddings are scalars
+            PropertyName::MarginTop | PropertyName::MarginRight |
+            PropertyName::MarginBottom | PropertyName::MarginLeft |
+            PropertyName::PaddingTop | PropertyName::PaddingRight |
+            PropertyName::PaddingBottom | PropertyName::PaddingLeft => PropertyValueType::Scalar,
 
+            // Colors
+            PropertyName::Color | PropertyName::Background |
+            PropertyName::BackgroundTint | PropertyName::Tint |
+            PropertyName::BorderTitleColor | PropertyName::BorderTitleBackground |
+            PropertyName::BorderSubtitleColor | PropertyName::BorderSubtitleBackground |
+            PropertyName::ScrollbarCornerColor |
+            PropertyName::ScrollbarBackgroundColor | PropertyName::ScrollbarBackgroundColorHover |
+            PropertyName::ScrollbarBackgroundColorActive |
+            PropertyName::ScrollbarColor | PropertyName::ScrollbarColorHover |
+            PropertyName::ScrollbarColorActive |
+            PropertyName::LinkColor | PropertyName::LinkBackgroundColor |
+            PropertyName::LinkHoverColor | PropertyName::LinkHoverBackgroundColor |
+            PropertyName::AutoLinkColor | PropertyName::AutoLinkBackgroundColor |
+            PropertyName::AutoLinkHoverColor | PropertyName::AutoLinkHoverBackgroundColor => PropertyValueType::Color,
+
+            // Booleans
+            PropertyName::AutoColor |
+            PropertyName::AutoBorderTitleColor |
+            PropertyName::AutoBorderSubtitleColor => PropertyValueType::Bool,
+
+            // Enums
             PropertyName::Display => PropertyValueType::Display,
             PropertyName::Visibility => PropertyValueType::Visibility,
+            PropertyName::Overflow | PropertyName::OverflowX |
+            PropertyName::OverflowY => PropertyValueType::Overflow,
+            PropertyName::TextAlign => PropertyValueType::TextAlign,
+            PropertyName::TextStyle |
+            PropertyName::BorderTitleStyle | PropertyName::BorderSubtitleStyle |
+            PropertyName::LinkStyle | PropertyName::LinkHoverStyle |
+            PropertyName::AutoLinkStyle | PropertyName::AutoLinkHoverStyle => PropertyValueType::TextStyle,
+            PropertyName::TextWrap => PropertyValueType::TextWrap,
+            PropertyName::TextOverflow => PropertyValueType::TextOverflow,
+            PropertyName::Layout => PropertyValueType::Layout,
+            PropertyName::Dock => PropertyValueType::Dock,
+            PropertyName::Expand => PropertyValueType::Expand,
+            PropertyName::Overlay => PropertyValueType::Overlay,
+            PropertyName::ConstrainX | PropertyName::ConstrainY => PropertyValueType::Constrain,
+            PropertyName::ScrollbarVisibility => PropertyValueType::ScrollbarVisibility,
+            PropertyName::ScrollbarGutter => PropertyValueType::ScrollbarGutter,
+
+            // Borders
+            PropertyName::Border => PropertyValueType::Border,
+            PropertyName::BorderTop | PropertyName::BorderRight |
+            PropertyName::BorderBottom | PropertyName::BorderLeft |
+            PropertyName::Outline | PropertyName::OutlineTop |
+            PropertyName::OutlineRight | PropertyName::OutlineBottom |
+            PropertyName::OutlineLeft => PropertyValueType::BorderEdge,
+
+            // Alignment enums
+            PropertyName::AlignHorizontal | PropertyName::ContentAlignHorizontal |
+            PropertyName::BorderTitleAlign | PropertyName::BorderSubtitleAlign => PropertyValueType::AlignHorizontal,
+            PropertyName::AlignVertical | PropertyName::ContentAlignVertical => PropertyValueType::AlignVertical,
+
+            // Integers
+            PropertyName::GridSizeRows | PropertyName::GridSizeColumns |
+            PropertyName::GridGutterHorizontal | PropertyName::GridGutterVertical |
+            PropertyName::ScrollbarSizeHorizontal | PropertyName::ScrollbarSizeVertical |
+            PropertyName::ColumnSpan | PropertyName::RowSpan |
+            PropertyName::LinePad => PropertyValueType::Integer,
+
+            // Floats
             PropertyName::Opacity | PropertyName::TextOpacity => PropertyValueType::Float,
 
-            // ... etc
+            // Strings
+            PropertyName::Layer => PropertyValueType::String,
+
+            // Name lists
+            PropertyName::Layers => PropertyValueType::NameList,
+
+            // Scalar lists (grid tracks)
+            PropertyName::GridRows | PropertyName::GridColumns => PropertyValueType::ScalarList,
+
+            // Offset
+            PropertyName::Offset | PropertyName::OffsetX |
+            PropertyName::OffsetY => PropertyValueType::Scalar,
+
+            // Box sizing
+            PropertyName::BoxSizing => PropertyValueType::BoxSizing,
+
+            // Special
+            PropertyName::Transition => PropertyValueType::Transition,
+            PropertyName::Hatch => PropertyValueType::Hatch,
+            PropertyName::Keyline => PropertyValueType::Keyline,
         }
     }
 
     /// Does this property trigger layout recalculation?
     pub fn triggers_layout(&self) -> bool {
         matches!(self,
+            // Dimensions
             PropertyName::Width | PropertyName::Height |
             PropertyName::MinWidth | PropertyName::MinHeight |
             PropertyName::MaxWidth | PropertyName::MaxHeight |
+            // Box model
             PropertyName::Margin | PropertyName::MarginTop |
             PropertyName::MarginRight | PropertyName::MarginBottom |
             PropertyName::MarginLeft | PropertyName::Padding |
             PropertyName::PaddingTop | PropertyName::PaddingRight |
             PropertyName::PaddingBottom | PropertyName::PaddingLeft |
+            PropertyName::Border | PropertyName::BorderTop |
+            PropertyName::BorderRight | PropertyName::BorderBottom |
+            PropertyName::BorderLeft |
+            // Display/positioning
             PropertyName::Display | PropertyName::Dock |
-            PropertyName::Layout | PropertyName::GridColumns |
-            PropertyName::GridRows | PropertyName::BoxSizing
+            PropertyName::Layout | PropertyName::BoxSizing |
+            PropertyName::Overlay | PropertyName::Expand |
+            PropertyName::ConstrainX | PropertyName::ConstrainY |
+            // Grid
+            PropertyName::GridColumns | PropertyName::GridRows |
+            PropertyName::GridSizeRows | PropertyName::GridSizeColumns |
+            PropertyName::GridGutterHorizontal | PropertyName::GridGutterVertical |
+            PropertyName::ColumnSpan | PropertyName::RowSpan |
+            // Scrollbar (affects layout)
+            PropertyName::ScrollbarVisibility |
+            PropertyName::ScrollbarSizeHorizontal | PropertyName::ScrollbarSizeVertical |
+            PropertyName::ScrollbarGutter
         )
     }
 
@@ -676,8 +773,16 @@ impl PropertyName {
         matches!(self,
             PropertyName::Width | PropertyName::Height |
             PropertyName::Color | PropertyName::Background |
-            PropertyName::Opacity | PropertyName::Offset |
-            PropertyName::Margin | PropertyName::Padding
+            PropertyName::BackgroundTint | PropertyName::Tint |
+            PropertyName::Opacity | PropertyName::TextOpacity |
+            PropertyName::Offset | PropertyName::OffsetX | PropertyName::OffsetY |
+            PropertyName::Margin | PropertyName::MarginTop |
+            PropertyName::MarginRight | PropertyName::MarginBottom |
+            PropertyName::MarginLeft |
+            PropertyName::Padding | PropertyName::PaddingTop |
+            PropertyName::PaddingRight | PropertyName::PaddingBottom |
+            PropertyName::PaddingLeft |
+            PropertyName::ScrollbarColor | PropertyName::ScrollbarBackgroundColor
         )
     }
 }
@@ -692,10 +797,20 @@ pub enum PropertyValueType {
     Overflow,
     TextAlign,
     TextStyle,
+    TextWrap,
+    TextOverflow,
     Layout,
     Dock,
+    Expand,
+    Overlay,
+    Constrain,
     Border,
     BorderEdge,
+    AlignHorizontal,
+    AlignVertical,
+    BoxSizing,
+    ScrollbarVisibility,
+    ScrollbarGutter,
     Integer,
     Float,
     Bool,

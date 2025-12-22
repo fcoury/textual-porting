@@ -204,7 +204,7 @@ impl ColorSystem {
     pub fn generate_variables(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
 
-        // Primary color shades
+        // Primary color shades (with background and muted variants)
         self.add_color_shades(&mut vars, "primary", &self.primary);
 
         // Optional semantic colors with shades
@@ -224,16 +224,16 @@ impl ColorSystem {
             self.add_color_shades(&mut vars, "accent", c);
         }
 
-        // Base colors with defaults
+        // Base colors using Textual constants
         vars.insert("foreground".into(), self.foreground.to_css());
         vars.insert("background".into(), self.background.to_css());
 
-        // Surface defaults to slightly lighter/darker than background
+        // Surface uses Textual's default constants if not specified
         let surface = self.surface.clone().unwrap_or_else(|| {
             if self.dark {
-                self.background.lighten(0.04)
+                DEFAULT_DARK_SURFACE.clone()
             } else {
-                self.background.darken(0.04)
+                DEFAULT_LIGHT_SURFACE.clone()
             }
         });
         vars.insert("surface".into(), surface.to_css());
@@ -251,20 +251,12 @@ impl ColorSystem {
         vars.insert("text-muted".into(), self.foreground.with_alpha(0.6).to_css());
         vars.insert("text-disabled".into(), self.foreground.with_alpha(0.4).to_css());
 
-        // Text on primary/secondary backgrounds
-        let text_on_primary = if self.primary.is_light() {
-            Color::parse("#000000").unwrap()
-        } else {
-            Color::parse("#ffffff").unwrap()
-        };
+        // Contrast text for colored backgrounds (uses Textual's contrast_text logic)
+        let text_on_primary = self.contrast_text(&self.primary);
         vars.insert("text-primary".into(), text_on_primary.to_css());
 
         if let Some(ref secondary) = self.secondary {
-            let text_on_secondary = if secondary.is_light() {
-                Color::parse("#000000").unwrap()
-            } else {
-                Color::parse("#ffffff").unwrap()
-            };
+            let text_on_secondary = self.contrast_text(secondary);
             vars.insert("text-secondary".into(), text_on_secondary.to_css());
         }
 
@@ -276,7 +268,7 @@ impl ColorSystem {
         vars
     }
 
-    /// Add color with lighten/darken shades and muted variant
+    /// Add color with lighten/darken shades, background, and muted variants
     fn add_color_shades(&self, vars: &mut HashMap<String, String>, name: &str, color: &Color) {
         // Base color
         vars.insert(name.into(), color.to_css());
@@ -295,30 +287,78 @@ impl ColorSystem {
             vars.insert(format!("{}-darken-{}", name, i), shade.to_css());
         }
 
-        // Background variant (for use as background color)
-        let bg = if self.dark {
-            color.darken(0.5)
-        } else {
-            color.lighten(0.5)
-        };
+        // Background variant (blended with theme background)
+        let bg = color.blend(&self.background, 0.85);
         vars.insert(format!("{}-background", name), bg.to_css());
 
-        // Muted variant (reduced opacity for subtle use)
-        let muted = color.with_alpha(0.5);
+        // Muted variant (reduced saturation/opacity for subtle use)
+        let muted = color.with_alpha(0.3);
         vars.insert(format!("{}-muted", name), muted.to_css());
+    }
+
+    /// Get contrasting text color for a background (matches Python's get_contrast_text)
+    fn contrast_text(&self, background: &Color) -> Color {
+        // Calculate relative luminance
+        let luminance = background.luminance();
+
+        // Use WCAG contrast threshold
+        if luminance > 0.179 {
+            // Light background: use dark text
+            Color::parse("#000000").unwrap().with_alpha(self.text_alpha)
+        } else {
+            // Dark background: use light text
+            Color::parse("#ffffff").unwrap().with_alpha(self.text_alpha)
+        }
     }
 }
 
+/// Default dark theme background (matches Python DEFAULT_DARK_BACKGROUND)
+pub static DEFAULT_DARK_BACKGROUND: Color = Color { r: 30, g: 30, b: 30, a: 1.0 };  // #1e1e1e
+
+/// Default dark theme surface (matches Python DEFAULT_DARK_SURFACE)
+pub static DEFAULT_DARK_SURFACE: Color = Color { r: 36, g: 36, b: 36, a: 1.0 };  // #242424
+
+/// Default light theme background
+pub static DEFAULT_LIGHT_BACKGROUND: Color = Color { r: 245, g: 245, b: 245, a: 1.0 };  // #f5f5f5
+
+/// Default light theme surface
+pub static DEFAULT_LIGHT_SURFACE: Color = Color { r: 255, g: 255, b: 255, a: 1.0 };  // #ffffff
+
 impl Color {
-    /// Check if color is light (for determining contrasting text color)
-    pub fn is_light(&self) -> bool {
-        // Use relative luminance formula
-        let r = self.r as f32 / 255.0;
-        let g = self.g as f32 / 255.0;
-        let b = self.b as f32 / 255.0;
-        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        luminance > 0.5
+    /// Calculate relative luminance (for WCAG contrast calculations)
+    pub fn luminance(&self) -> f32 {
+        // Convert to linear RGB
+        fn to_linear(c: u8) -> f32 {
+            let c = c as f32 / 255.0;
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        let r = to_linear(self.r);
+        let g = to_linear(self.g);
+        let b = to_linear(self.b);
+        0.2126 * r + 0.7152 * g + 0.0722 * b
     }
+
+    /// Blend this color with another by factor (0.0 = self, 1.0 = other)
+    pub fn blend(&self, other: &Color, factor: f32) -> Color {
+        Color {
+            r: lerp_u8(self.r, other.r, factor),
+            g: lerp_u8(self.g, other.g, factor),
+            b: lerp_u8(self.b, other.b, factor),
+            a: lerp_f32(self.a, other.a, factor),
+        }
+    }
+}
+
+fn lerp_u8(a: u8, b: u8, t: f32) -> u8 {
+    (a as f32 + (b as f32 - a as f32) * t).round() as u8
+}
+
+fn lerp_f32(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
 }
 
 impl Color {
