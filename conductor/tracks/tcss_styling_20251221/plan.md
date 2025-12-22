@@ -39,8 +39,8 @@
 
 ### 3.3 Animations
 - [x] Task: Implement @keyframes rule parsing [6b704ba]
-- [~] Task: Implement animation property parsing
-- [ ] Task: Implement animation timeline
+- [x] Task: Implement animation property parsing [6182fdc]
+- [~] Task: Implement animation timeline
 - [ ] Task: Implement easing functions (linear, ease-in, ease-out, ease-in-out)
 - [ ] Task: Implement cubic-bezier easing
 - [ ] Task: Implement animation events (on_animation_end)
