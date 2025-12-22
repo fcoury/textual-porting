@@ -38,11 +38,11 @@
 - [x] Task: Write tests for Static [0d51b8c]
 
 ### 3.2 Label Widget (REBUILD - extends Static)
-- [ ] Task: Remove existing Label implementation
-- [ ] Task: Implement Label extending Static
-- [ ] Task: Implement LabelVariant support
-- [ ] Task: Add variant class styling
-- [ ] Task: Write tests for Label
+- [x] Task: Remove existing Label implementation [1976105]
+- [x] Task: Implement Label extending Static [1976105]
+- [x] Task: Implement LabelVariant support [1976105]
+- [x] Task: Add variant class styling [1976105]
+- [x] Task: Write tests for Label [1976105]
 
 ### 3.3 Button Widget (REBUILD)
 - [ ] Task: Remove existing Button implementation
