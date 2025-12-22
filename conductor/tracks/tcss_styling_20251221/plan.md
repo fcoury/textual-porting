@@ -26,7 +26,7 @@
 - [x] Task: Implement text properties (text-align, text-style) [2fc5562]
 - [x] Task: Implement display properties (display, visibility, opacity) [108ab64]
 - [x] Task: Implement scroll properties (overflow, scrollbar-*) [5004aa5]
-- [ ] Task: Write tests for property parsing
+- [x] Task: Write tests for property parsing [5004aa5]
 
 ### 3.2 Advanced Selectors
 - [ ] Task: Implement descendant combinator (space)
