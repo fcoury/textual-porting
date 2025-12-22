@@ -24,7 +24,7 @@
 - [x] Task: Design DEFAULT_CSS pattern in Rust [6820188]
 - [x] Task: Design message types matching Python Textual exactly [3b88b76]
 - [x] Task: Design Validator and Suggester traits for Input [2a796c2]
-- [~] Task: Write technical design document
+- [x] Task: Write technical design document [7d69c43]
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
