@@ -3,7 +3,7 @@
 ## Phase 1: Analysis & Research
 - [x] Task: Study Python Textual _static.py as base for Label [cc15181]
 - [x] Task: Analyze _button.py for variants, action support, DEFAULT_CSS [2061a96]
-- [ ] Task: Study _input.py for ScrollView inheritance, selection, validation, suggester
+- [x] Task: Study _input.py for ScrollView inheritance, selection, validation, suggester [0b89586]
 - [ ] Task: Document _header.py clock, icon, screen title integration
 - [ ] Task: Analyze _footer.py binding collection and display
 - [ ] Task: Study _checkbox.py, _radio_button.py, _switch.py patterns
