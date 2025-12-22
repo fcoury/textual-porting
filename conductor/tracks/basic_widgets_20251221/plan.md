@@ -21,8 +21,8 @@
 ## Phase 2: Design & Planning
 - [x] Task: Design Static base widget with markup support [715bdde]
 - [x] Task: Design reactive property integration for all widgets [00de357]
-- [~] Task: Design DEFAULT_CSS pattern in Rust
-- [ ] Task: Design message types matching Python Textual exactly
+- [x] Task: Design DEFAULT_CSS pattern in Rust [6820188]
+- [~] Task: Design message types matching Python Textual exactly
 - [ ] Task: Design Validator and Suggester traits for Input
 - [ ] Task: Write technical design document
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
