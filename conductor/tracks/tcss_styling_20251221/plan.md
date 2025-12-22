@@ -93,10 +93,11 @@
 - [x] Task: Connect @keyframes to StyleSheet::parse [d374d5e]
 - [x] Task: Implement 6-tuple specificity (is_user_css, important, ids, classes, types, tie_breaker) [d374d5e]
 
-### 5.2 Medium Priority Fixes (Deferred)
-- [ ] Task: Variable substitution - only substitute $tokens, not $ in strings/comments
-- [ ] Task: Duration parsing - require ms/s units like Python
+### 5.2 Medium Priority Fixes (Completed)
+- [x] Task: Variable substitution - only substitute $tokens, not $ in strings/comments [already implemented via resolve_variables_string_aware]
+- [x] Task: Duration parsing - require ms/s units like Python [7ae72a4]
 
-> **Note:** High priority issues from code review have been addressed.
-> Medium priority issues deferred for future work.
-> Final tests: 986 passed (17 new tests added for color parsing, selectors, keyframes, specificity).
+> **Note:** All issues from code review have been addressed.
+> - Variable substitution: `resolve_variables_string_aware` skips quoted strings; comments stripped during tokenization
+> - Duration parsing: Now returns error if no `ms` or `s` unit provided (matches Python Textual regex: `\d+\.?\d*(?:ms|s)`)
+> Final tests: 988 passed
