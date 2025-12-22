@@ -230,14 +230,27 @@ impl Message for InputBlurred {}
 ### OptionList
 
 ```rust
+/// An option in an OptionList.
+/// Named `ListOption` in Rust to avoid conflict with `Option<T>`.
+/// Corresponds to Python's `textual.widgets.option_list.Option`.
+#[derive(Debug, Clone)]
+pub struct ListOption {
+    /// The prompt (text displayed) for the option.
+    pub prompt: ContentType,
+    /// Optional ID for the option.
+    pub id: Option<String>,
+    /// Whether the option is disabled.
+    pub disabled: bool,
+}
+
 /// Base message for OptionList events.
 #[derive(Debug, Clone)]
 pub struct OptionMessage {
     /// Reference to the option list.
     pub option_list: WidgetRef<OptionList>,
     /// The option involved.
-    pub option: Option<OptionData>,
-    /// The option's ID (if set).
+    pub option: ListOption,
+    /// The option's ID (if set). Extracted from option.id for convenience.
     pub option_id: Option<String>,
     /// The option's index in the list.
     pub option_index: usize,
