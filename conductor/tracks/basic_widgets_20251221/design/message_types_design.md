@@ -248,6 +248,9 @@ pub struct ListOption {
     pub id: Option<String>,
     /// Whether the option is disabled.
     pub disabled: bool,
+    /// Whether this is a divider (separator) rather than a selectable option.
+    /// Corresponds to Python's `Option._divider` internal flag.
+    pub is_divider: bool,
 }
 
 /// Base message for OptionList events.

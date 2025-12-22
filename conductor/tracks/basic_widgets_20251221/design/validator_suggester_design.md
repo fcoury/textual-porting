@@ -447,11 +447,11 @@ pub trait SuggesterImpl: Send + Sync + std::fmt::Debug {
     /// Get a suggestion for the given value.
     ///
     /// Args:
-    ///   value: The input value (already normalized if case_sensitive=false)
+    ///   value: The input value (already casefolded if case_sensitive=false)
     ///   case_sensitive: Whether matching should be case-sensitive
     ///
-    /// Note: When case_sensitive=false, the value is already lowercased.
-    /// Implementations should also lowercase their comparison targets.
+    /// Note: When case_sensitive=false, the value is already casefolded.
+    /// Implementations should also casefold their comparison targets.
     async fn get_suggestion(&self, value: &str, case_sensitive: bool) -> Option<String>;
 }
 
