@@ -15,7 +15,7 @@
 - [x] Task: Design Tab/TabPane/TabbedContent relationship [a89f914]
 - [x] Task: Plan collapsible animation approach (Result: No animation - instant toggle via display:none) [a89f914]
 - [x] Task: Write technical design document [a89f914]
-- [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md) [63eee40]
 
 ## Phase 3: Implementation
 
@@ -143,5 +143,8 @@
 - [ ] Task: Create integration tests with nested containers
 - [ ] Task: Create example app with tabs, collapsibles, scrolling
 - [ ] Task: Test keyboard navigation
+- [ ] Task: Test layout_recursive Display::None filtering (docked + content children, ContentSwitcher panes)
+- [ ] Task: Test grid_config() via Widget trait (ItemGrid custom config, existing Grid.grid_config())
+- [ ] Task: Test CloneableWidget + add_boxed() with downcasting/query paths and Auto sizing
 - [ ] Task: Run all tests and fix failures
 - [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
