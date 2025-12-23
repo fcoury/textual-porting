@@ -4,7 +4,7 @@
 - [x] Task: Study Python Textual containers.py implementation [b8379a3]
 - [x] Task: Analyze ScrollableContainer and scroll methods [9ccbbdb]
 - [x] Task: Document _tabbed_content.py and _tabs.py in detail [7b9ffa7]
-- [ ] Task: Study _collapsible.py animation and state management
+- [~] Task: Study _collapsible.py animation and state management
 - [ ] Task: Analyze _content_switcher.py patterns
 - [ ] Task: Map container DEFAULT_CSS patterns
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
