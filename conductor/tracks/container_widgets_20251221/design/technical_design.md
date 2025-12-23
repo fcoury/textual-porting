@@ -438,12 +438,16 @@ impl VerticalLayout {
 
 #### 3.2 Layout Dispatch and Grid Config Integration
 
-The layout system dispatches to the appropriate algorithm based on `layout_type()`. **Critical**: For `LayoutType::Grid`, the system must use `widget.grid_config()` to get the widget's configuration:
+The layout system dispatches to the appropriate algorithm based on `layout_type()`. **Critical**:
+1. `VerticalLayout` and `HorizontalLayout` are ZST singletons accessed via `LayoutType::get_layout()`
+2. For `LayoutType::Grid`, use `widget.grid_config()` and `GridLayout::with_config()`
+3. **All paths** must filter `Display::None` children via `get_visible_children()`
 
 ```rust
 // In layout.rs - layout dispatch:
 
 /// Perform layout for a widget and its children.
+/// Filters Display::None children before dispatching to layout algorithm.
 pub fn layout_widget(
     registry: &WidgetRegistry,
     widget_id: WidgetId,
@@ -451,19 +455,27 @@ pub fn layout_widget(
 ) -> HashMap<WidgetId, Rect> {
     let widget = registry.get(widget_id).expect("widget exists");
 
+    // Filter visible children BEFORE layout (applies to all layout types)
+    let visible_children = get_visible_children(registry, widget_id);
+
     match widget.layout_type() {
         Some(LayoutType::Vertical) => {
-            VerticalLayout::new().layout(registry, widget_id, area)
+            // ZST singleton via get_layout()
+            LayoutType::Vertical.get_layout()
+                .arrange(registry, &visible_children, area)
         }
         Some(LayoutType::Horizontal) => {
-            HorizontalLayout::new().layout(registry, widget_id, area)
+            // ZST singleton via get_layout()
+            LayoutType::Horizontal.get_layout()
+                .arrange(registry, &visible_children, area)
         }
         Some(LayoutType::Grid) => {
             // CRITICAL: Use widget's grid_config or fallback to default
             let config = widget.grid_config()
                 .cloned()
                 .unwrap_or_default();
-            GridLayout::new(config).layout(registry, widget_id, area)
+            GridLayout::with_config(config)
+                .arrange(registry, &visible_children, area)
         }
         None => {
             // Leaf widget or default behavior - no children to layout
@@ -477,6 +489,9 @@ This ensures:
 - `ItemGrid` and wrapped Grid widgets in `CloneableWidget` content use their custom config
 - Widgets without explicit `grid_config()` fall back to `GridConfig::default()`
 - The `BoxedCloneableWrapper` delegates `grid_config()` to the inner widget (Section 2.4)
+- `Display::None` children are excluded from **all** layout paths (including Grid)
+
+**Note**: The existing `Grid` container (in container.rs) must implement `grid_config()` to expose its configuration. See Section 4.2.
 
 #### 3.3 Constraint Resolution with Fraction and Min/Max Support
 
@@ -839,7 +854,28 @@ impl Widget for Right {
 }
 ```
 
-#### 4.2 Group Containers
+#### 4.2 Existing Grid Update
+
+The existing `Grid` container (in container.rs) has a `config: GridConfig` field and `config()` getter, but doesn't expose it via the Widget trait. Add `grid_config()` to enable layout dispatch to use the widget's configuration:
+
+```rust
+// src/widgets/container.rs - UPDATE existing Grid Widget impl:
+
+impl Widget for Grid {
+    // ... existing methods ...
+
+    /// Expose grid configuration for layout dispatch.
+    /// Required for layout_widget() to use the widget's GridConfig
+    /// instead of defaulting to GridConfig::default().
+    fn grid_config(&self) -> Option<&GridConfig> {
+        Some(&self.config)
+    }
+}
+```
+
+Without this, the layout dispatch (Section 3.2) will fall back to `GridConfig::default()`, ignoring any custom column/row configuration set via `Grid::with_config()` or `Grid::columns()`.
+
+#### 4.3 Group Containers
 
 Group containers shrink to content height. Overflow is handled via DEFAULT_CSS (not LayoutHints) since overflow stays in scroll.rs:
 
@@ -919,7 +955,7 @@ impl Widget for HorizontalGroup {
 }
 ```
 
-#### 4.3 ItemGrid
+#### 4.4 ItemGrid
 
 ItemGrid must override `layout_type()` to return Grid and expose its config. **Critical**: The cached config must be updated whenever reactive properties change, so `grid_config()` returns the up-to-date computed value:
 
