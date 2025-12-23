@@ -402,96 +402,160 @@ impl<'a> ComposeContext<'a> {
 
 ### 3. Layout System Integration
 
-#### 3.1 Layout Filtering for Display::None
+#### 3.1 Display Filtering in layout_recursive
 
-Layout algorithms work with the WidgetRegistry to get children and filter by display. The layout system uses WidgetId, not widget references:
+The real layout pipeline is `compute_layout()` → `layout_recursive()`. The `layout_recursive()` function partitions children into **docked** and **content** groups. Display filtering must apply to **both** groups to prevent hidden widgets from consuming space.
 
 ```rust
-// In layout.rs - layout filtering with registry:
+// In layout.rs - helper to check visibility:
 
-/// Get visible children for a parent widget.
-fn get_visible_children(
+/// Check if a child should be visible based on effective display.
+fn is_child_visible(
     registry: &WidgetRegistry,
     parent_id: WidgetId,
-) -> Vec<WidgetId> {
-    registry.get_children(parent_id)
-        .iter()
-        .copied()
-        .filter(|&child_id| {
-            get_effective_display(registry, parent_id, child_id) != Display::None
-        })
-        .collect()
+    child_id: WidgetId,
+) -> bool {
+    get_effective_display(registry, parent_id, child_id) != Display::None
 }
 
-impl VerticalLayout {
-    pub fn layout(
-        &self,
-        registry: &WidgetRegistry,
-        parent_id: WidgetId,
-        area: Rect,
-    ) -> HashMap<WidgetId, Rect> {
-        let visible_children = get_visible_children(registry, parent_id);
-        self.layout_children(registry, parent_id, &visible_children, area)
-    }
-}
-```
+// In layout_recursive() - UPDATE child partitioning to filter Display::None:
 
-#### 3.2 Layout Dispatch and Grid Config Integration
-
-The layout system dispatches to the appropriate algorithm based on `layout_type()`. **Critical**:
-1. `VerticalLayout` and `HorizontalLayout` are ZST singletons accessed via `LayoutType::get_layout()`
-2. For `LayoutType::Grid`, use `widget.grid_config()` and `GridLayout::with_config()`
-3. **All paths** must filter `Display::None` children via `get_visible_children()`
-
-```rust
-// In layout.rs - layout dispatch:
-
-/// Perform layout for a widget and its children.
-/// Filters Display::None children before dispatching to layout algorithm.
-pub fn layout_widget(
+fn layout_recursive(
     registry: &WidgetRegistry,
     widget_id: WidgetId,
-    area: Rect,
-) -> HashMap<WidgetId, Rect> {
-    let widget = registry.get(widget_id).expect("widget exists");
+    widget_rect: Rect,
+    cache: &mut LayoutCache,
+) {
+    cache.set(widget_id, widget_rect);
 
-    // Filter visible children BEFORE layout (applies to all layout types)
-    let visible_children = get_visible_children(registry, widget_id);
+    let children = registry.get_children(widget_id).to_vec();
+    if children.is_empty() {
+        return;
+    }
 
-    match widget.layout_type() {
-        Some(LayoutType::Vertical) => {
-            // ZST singleton via get_layout()
-            LayoutType::Vertical.get_layout()
-                .arrange(registry, &visible_children, area)
+    // Partition children into docked vs content, FILTERING Display::None
+    let mut docked_children: Vec<(WidgetId, LayoutHints)> = Vec::new();
+    let mut content_children: Vec<WidgetId> = Vec::new();
+
+    for &child_id in &children {
+        // CRITICAL: Skip Display::None children entirely (both docked AND content)
+        if !is_child_visible(registry, widget_id, child_id) {
+            continue;
         }
-        Some(LayoutType::Horizontal) => {
-            // ZST singleton via get_layout()
-            LayoutType::Horizontal.get_layout()
-                .arrange(registry, &visible_children, area)
+
+        if let Some(child_widget) = registry.get(child_id) {
+            let child_hints = child_widget.layout();
+            if child_hints.dock.is_some() {
+                docked_children.push((child_id, child_hints));
+            } else {
+                content_children.push(child_id);
+            }
         }
-        Some(LayoutType::Grid) => {
-            // CRITICAL: Use widget's grid_config or fallback to default
-            let config = widget.grid_config()
-                .cloned()
-                .unwrap_or_default();
-            GridLayout::with_config(config)
-                .arrange(registry, &visible_children, area)
-        }
-        None => {
-            // Leaf widget or default behavior - no children to layout
-            HashMap::new()
-        }
+    }
+
+    // Layout docked children first (now excludes Display::None)
+    let dock_items: Vec<DockItem> = docked_children
+        .iter()
+        .map(|(_, hints)| {
+            let dock = hints.dock.unwrap();
+            let size = resolve_hint_size(hints, widget_rect);
+            DockItem { dock, size }
+        })
+        .collect();
+
+    let dock_result = DockLayout::solve(widget_rect, &dock_items);
+
+    // Recursively layout docked children
+    for (idx, (child_id, _)) in docked_children.iter().enumerate() {
+        let child_rect = dock_result.placements[idx];
+        layout_recursive(registry, *child_id, child_rect, cache);
+    }
+
+    // Layout content children (already filtered above)
+    if !content_children.is_empty() {
+        // ... dispatch to layout algorithm (see Section 3.2)
     }
 }
 ```
 
 This ensures:
-- `ItemGrid` and wrapped Grid widgets in `CloneableWidget` content use their custom config
-- Widgets without explicit `grid_config()` fall back to `GridConfig::default()`
-- The `BoxedCloneableWrapper` delegates `grid_config()` to the inner widget (Section 2.4)
-- `Display::None` children are excluded from **all** layout paths (including Grid)
+- Hidden **docked** widgets don't consume dock space (top/left/right/bottom)
+- Hidden **content** widgets don't consume layout slots (vertical/horizontal/grid)
+- ContentSwitcher's inactive panes are excluded from both layout paths
 
-**Note**: The existing `Grid` container (in container.rs) must implement `grid_config()` to expose its configuration. See Section 4.2.
+#### 3.2 Layout Dispatch with grid_config()
+
+The content layout dispatch uses the real `Layout::arrange` signature:
+
+```rust
+// Layout trait signature (in layout.rs):
+pub trait Layout: Debug + Send + Sync {
+    fn arrange(
+        &self,
+        context: &LayoutContext,
+        parent_id: WidgetId,
+        children: &[WidgetId],
+        size: Size,
+        greedy: bool,
+    ) -> Vec<WidgetPlacement>;
+}
+
+// In layout_recursive() - content children dispatch:
+
+if !content_children.is_empty() {
+    let layout_type = registry
+        .get(widget_id)
+        .and_then(|w| w.layout_type())
+        .unwrap_or(LayoutType::Vertical);
+
+    let viewport = Size::new(dock_result.remaining.width, dock_result.remaining.height);
+    let context = LayoutContext::new(registry, viewport);
+    let available_size = Size::new(dock_result.remaining.width, dock_result.remaining.height);
+
+    let placements = match layout_type {
+        LayoutType::Vertical => VerticalLayout.arrange(
+            &context, widget_id, &content_children, available_size, true,
+        ),
+        LayoutType::Horizontal => HorizontalLayout.arrange(
+            &context, widget_id, &content_children, available_size, true,
+        ),
+        LayoutType::Grid => {
+            // Use widget's grid_config() or fallback to default
+            let config = get_grid_config_from_widget(registry, widget_id);
+            GridLayout::with_config(config).arrange(
+                &context, widget_id, &content_children, available_size, true,
+            )
+        }
+    };
+
+    // Recursively layout each placed child
+    for placement in placements {
+        let child_rect = Rect::new(
+            dock_result.remaining.x + placement.region.x,
+            dock_result.remaining.y + placement.region.y,
+            placement.region.width,
+            placement.region.height,
+        );
+        layout_recursive(registry, placement.widget_id, child_rect, cache);
+    }
+}
+
+/// Get GridConfig from widget via grid_config() trait method.
+/// Falls back to GridConfig::default() if not implemented.
+fn get_grid_config_from_widget(registry: &WidgetRegistry, widget_id: WidgetId) -> GridConfig {
+    registry.get(widget_id)
+        .and_then(|w| w.grid_config())
+        .cloned()
+        .unwrap_or_default()
+}
+```
+
+This ensures:
+- `ItemGrid` and wrapped Grid widgets in `CloneableWidget` content use their custom config
+- The `BoxedCloneableWrapper` delegates `grid_config()` to the inner widget (Section 2.4)
+- Widgets without explicit `grid_config()` fall back to `GridConfig::default()`
+
+**Note**: The existing `Grid` container must implement `grid_config()` - see Section 4.2.
 
 #### 3.3 Constraint Resolution with Fraction and Min/Max Support
 
