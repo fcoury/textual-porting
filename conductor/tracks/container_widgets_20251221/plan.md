@@ -130,12 +130,12 @@
 - [ ] Task: Write tests for Collapsible
 
 ### 3.14 ContentSwitcher Widget
-- [ ] Task: Implement ContentSwitcher struct
-- [ ] Task: Implement current property
-- [ ] Task: Implement visibility toggling for children
-- [ ] Task: Implement CurrentChanged message
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for ContentSwitcher
+- [x] Task: Implement ContentSwitcher struct
+- [x] Task: Implement current property
+- [x] Task: Implement visibility toggling for children (via ChildDisplayOverride trait)
+- [x] Task: Implement CurrentChanged message
+- [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: auto)
+- [x] Task: Write tests for ContentSwitcher (15 tests)
 
 - [ ] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
 
