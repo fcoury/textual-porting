@@ -250,32 +250,91 @@ fn get_effective_display(
 }
 ```
 
-### 2.3 ComposeContext Extensions
+### 2.3 CloneableWidget Trait
 
-ComposeContext needs additional methods to support CloneableWidget for composite widgets (TabbedContent, Collapsible, TabPane):
+CloneableWidget enables composite widgets (TabbedContent, TabPane, Collapsible) to store content widgets and clone them during compose. This trait is used before TabPane and Collapsible are defined.
+
+```rust
+// In widget.rs - add CloneableWidget trait:
+
+/// Trait for widgets that can be cloned into a Box.
+/// Required for widgets stored in composite containers (TabPane, Collapsible).
+/// Has blanket impl for all Widget + Clone types.
+pub trait CloneableWidget: Widget {
+    /// Clone self into a Box.
+    fn clone_box(&self) -> Box<dyn CloneableWidget>;
+}
+
+// Blanket implementation for all Clone + Widget types
+impl<T: Widget + Clone + 'static> CloneableWidget for T {
+    fn clone_box(&self) -> Box<dyn CloneableWidget> {
+        Box::new(self.clone())
+    }
+}
+```
+
+### 2.4 ComposeContext and WidgetRegistry Extensions
+
+ComposeContext needs an additional method to support CloneableWidget. This requires a corresponding WidgetRegistry extension to handle boxed widgets.
+
+```rust
+// In widget.rs - extend WidgetRegistry:
+
+impl WidgetRegistry {
+    // Existing methods: add(), set_parent(), get_children(), etc.
+
+    /// Add a boxed widget that implements CloneableWidget.
+    /// Used by ComposeContext::add_cloneable for dynamic widget types.
+    pub fn add_boxed(&mut self, widget: Box<dyn CloneableWidget>) -> WidgetId {
+        // Box<dyn CloneableWidget> implements Widget via supertrait
+        // Store in the registry like any other widget
+        let id = self.next_id();
+        self.widgets.insert(id, Box::new(BoxedCloneableWrapper(widget)));
+        id
+    }
+}
+
+/// Wrapper to store Box<dyn CloneableWidget> in the registry.
+/// Implements Widget by delegating to the inner widget.
+struct BoxedCloneableWrapper(Box<dyn CloneableWidget>);
+
+impl std::fmt::Debug for BoxedCloneableWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BoxedCloneableWrapper({:?})", self.0.widget_type_name())
+    }
+}
+
+impl Widget for BoxedCloneableWrapper {
+    fn render(&self, area: Rect, frame: &mut Frame) {
+        self.0.render(area, frame)
+    }
+
+    fn layout(&self) -> LayoutHints {
+        self.0.layout()
+    }
+
+    fn id(&self) -> Option<&str> {
+        self.0.id()
+    }
+
+    // Delegate other Widget methods to self.0...
+}
+```
 
 ```rust
 // In compose.rs - extend ComposeContext:
 
-impl ComposeContext {
-    // Existing methods...
+impl<'a> ComposeContext<'a> {
+    // Existing methods: add(), add_with(), add_if(), add_iter(), etc.
 
     /// Add a widget that implements CloneableWidget.
-    /// Clones the widget and adds it to the registry.
+    /// Clones the widget and adds it to the registry under current parent.
     /// Used by composite widgets that store content via Box<dyn CloneableWidget>.
     pub fn add_cloneable(&mut self, widget: &dyn CloneableWidget) -> WidgetId {
         let boxed = widget.clone_box();
-        self.add_boxed_widget(boxed)
-    }
-
-    /// Internal: Add a boxed widget to the registry.
-    fn add_boxed_widget(&mut self, widget: Box<dyn CloneableWidget>) -> WidgetId {
-        // Implementation: register the boxed widget and return its ID
-        // The boxed widget implements Widget via CloneableWidget supertrait
-        let id = self.registry.register_boxed(widget);
-        if let Some(parent) = self.current_parent {
-            self.registry.add_child(parent, id);
-        }
+        let id = self.registry.add_boxed(boxed);
+        self.registry.set_parent(id, Some(self.parent_id));
+        self.children.push(id);
         id
     }
 }
@@ -1583,13 +1642,13 @@ TabPane stores its content using CloneableWidget so content survives cloning int
 
 ```rust
 /// A pane of content associated with a tab.
-/// Implements Clone via clone_with_content() for TabbedContent storage.
-#[derive(Clone)]
+/// Implements Clone manually to handle Vec<Box<dyn CloneableWidget>>.
 pub struct TabPane {
     id: String,  // Required, non-empty
     title: String,
     disabled: bool,
     /// Content widgets stored for compose (require Clone).
+    /// Uses CloneableWidget trait defined in Section 2.3.
     content: Vec<Box<dyn CloneableWidget>>,
 }
 
@@ -2027,20 +2086,8 @@ pub struct Collapsible {
     /// Collapsed state (default: true).
     collapsed: bool,
     /// Content widgets stored until compose (require Clone).
+    /// Uses CloneableWidget trait defined in Section 2.3.
     content: Vec<Box<dyn CloneableWidget>>,
-}
-
-/// Trait for widgets that can be cloned (required for composite widgets).
-/// Widgets stored in TabbedContent/Collapsible must implement this.
-pub trait CloneableWidget: Widget {
-    fn clone_box(&self) -> Box<dyn CloneableWidget>;
-}
-
-// Blanket implementation for Clone + Widget types
-impl<T: Widget + Clone + 'static> CloneableWidget for T {
-    fn clone_box(&self) -> Box<dyn CloneableWidget> {
-        Box::new(self.clone())
-    }
 }
 
 /// Collapsible toggled message.
@@ -2187,7 +2234,7 @@ impl Collapsible {
 
 ### 9. Widget Trait Extension Summary
 
-All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. ComposeContext extensions are in **Section 2.3**. This section summarizes the new APIs:
+All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. CloneableWidget trait is in **Section 2.3**. ComposeContext/WidgetRegistry extensions are in **Section 2.4**. This section summarizes the new APIs:
 
 **Widget Trait Methods:**
 
@@ -2274,8 +2321,8 @@ CollapsibleTitle, Contents (new)
      - `grid_config()` → `Option<&GridConfig>`
      - `as_display_override()` → `Option<&dyn ChildDisplayOverride>`
    - Add `ChildDisplayOverride` trait to widget.rs (see Section 2.2)
-   - Add `CloneableWidget` trait to widget.rs (for composite widget content storage)
-   - Extend ComposeContext with `add_cloneable()` method (see Section 2.3)
+   - Add `CloneableWidget` trait to widget.rs (see Section 2.3)
+   - Add `WidgetRegistry::add_boxed()` and `ComposeContext::add_cloneable()` (see Section 2.4)
    - Update layout algorithms:
      - Filter `display: none` widgets via `get_effective_display()`
      - Two-pass constraint resolution for Fraction support
