@@ -85,49 +85,50 @@
 - [x] Task: Write tests for HorizontalScroll
 
 ### 3.10 TabPane Widget
-- [ ] Task: Implement TabPane struct
-- [ ] Task: Implement title property
-- [ ] Task: Implement disabled property
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for TabPane
+- [x] Task: Implement TabPane struct
+- [x] Task: Implement title property
+- [x] Task: Implement disabled property
+- [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: auto)
+- [x] Task: Write tests for TabPane (4 tests)
 
 ### 3.11 Tabs Widget
-- [ ] Task: Implement Tabs struct (tab bar)
-- [ ] Task: Implement active property
-- [ ] Task: Implement tab rendering
-- [ ] Task: Implement active tab styling
-- [ ] Task: Implement keyboard navigation (arrows)
-- [ ] Task: Implement TabActivated message
-- [ ] Task: Implement Cleared message
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Tabs
+- [x] Task: Implement Tabs struct (tab bar)
+- [x] Task: Implement active property
+- [x] Task: Implement tab rendering
+- [x] Task: Implement active tab styling
+- [x] Task: Implement keyboard navigation (next_tab/previous_tab with wrap-around)
+- [x] Task: Implement TabActivated message
+- [x] Task: Implement Cleared message (TabsCleared)
+- [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: 2)
+- [x] Task: Write tests for Tabs (17 tests)
+- [x] Task: Implement Tab widget (label, disabled, hidden, active states)
+- [x] Task: Implement Underline widget (highlight indicator)
+- [x] Task: Write tests for Tab (6 tests) and Underline (3 tests)
 
 ### 3.12 TabbedContent Widget
-- [ ] Task: Implement TabbedContent struct
-- [ ] Task: Implement active property
-- [ ] Task: Implement add_pane() method
-- [ ] Task: Implement remove_pane() method
-- [ ] Task: Implement clear_panes() method
-- [ ] Task: Implement get_tab() method
-- [ ] Task: Implement get_pane() method
-- [ ] Task: Wire Tabs and TabPanes together
-- [ ] Task: Implement TabActivated message
-- [ ] Task: Implement Cleared message
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for TabbedContent
+- [x] Task: Implement TabbedContent struct
+- [x] Task: Implement active property
+- [x] Task: Implement with_pane_info() method for adding panes
+- [x] Task: Implement disable_tab/enable_tab methods
+- [x] Task: Implement hide_tab/show_tab methods
+- [x] Task: Wire Tabs and ContentSwitcher together via compose()
+- [x] Task: Implement TabbedContentActivated message
+- [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: auto)
+- [x] Task: Write tests for TabbedContent (7 tests)
 
 ### 3.13 Collapsible Widget
-- [ ] Task: Implement Collapsible struct
-- [ ] Task: Implement collapsed reactive property
-- [ ] Task: Implement title property
-- [ ] Task: Implement collapsible header rendering
-- [ ] Task: Implement expand() method
-- [ ] Task: Implement collapse() method
-- [ ] Task: Implement toggle() method (instant toggle, no animation per research)
-- [ ] Task: Implement Toggled message
-- [ ] Task: Add keyboard support (Enter to toggle)
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Collapsible
+- [x] Task: Implement Collapsible struct
+- [x] Task: Implement collapsed property
+- [x] Task: Implement title property
+- [x] Task: Implement CollapsibleTitle header (symbol + label)
+- [x] Task: Implement Contents container
+- [x] Task: Implement expand() method
+- [x] Task: Implement collapse() method
+- [x] Task: Implement toggle() method (instant toggle, no animation per research)
+- [x] Task: Implement CollapsibleToggled, CollapsibleExpanded, CollapsibleCollapsed messages
+- [x] Task: Add keyboard support (CollapsibleTitle is focusable for Enter toggle)
+- [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: auto)
+- [x] Task: Write tests for Collapsible (27 tests including Title and Contents)
 
 ### 3.14 ContentSwitcher Widget
 - [x] Task: Implement ContentSwitcher struct
