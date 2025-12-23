@@ -297,7 +297,7 @@ impl WidgetRegistry {
         // Insert into widgets SlotMap (returns the WidgetId key)
         let id = self.widgets.insert(wrapped);
         // Create corresponding TreeNode entry (mirrors add() behavior)
-        self.nodes.insert_with_key(|_| TreeNode::new(id));
+        self.nodes.insert_with_key(|node_id| TreeNode::new(node_id));
         id
     }
 }
@@ -348,6 +348,30 @@ impl Widget for BoxedCloneableWrapper {
 
     fn on_message(&mut self, msg: &dyn Any) -> bool {
         self.0.on_message(msg)
+    }
+
+    fn get_content_width(&self) -> u16 {
+        self.0.get_content_width()
+    }
+
+    fn get_content_height(&self) -> u16 {
+        self.0.get_content_height()
+    }
+
+    fn grid_config(&self) -> Option<&GridConfig> {
+        self.0.grid_config()
+    }
+
+    fn as_display_override(&self) -> Option<&dyn ChildDisplayOverride> {
+        self.0.as_display_override()
+    }
+
+    fn as_timer_widget(&self) -> Option<&dyn TimerWidget> {
+        self.0.as_timer_widget()
+    }
+
+    fn as_timer_widget_mut(&mut self) -> Option<&mut dyn TimerWidget> {
+        self.0.as_timer_widget_mut()
     }
 }
 ```
@@ -1174,7 +1198,7 @@ impl Widget for ContentSwitcher {
     }
 
     /// Check if this widget overrides child display (for layout filtering).
-    fn as_content_switcher(&self) -> Option<&ContentSwitcher> {
+    fn as_display_override(&self) -> Option<&dyn ChildDisplayOverride> {
         Some(self)
     }
 
@@ -1265,6 +1289,11 @@ impl Tab {
 
     pub fn is_hidden(&self) -> bool {
         self.hidden
+    }
+
+    /// Set the hidden state of this tab.
+    pub fn set_hidden(&mut self, hidden: bool) {
+        self.hidden = hidden;
     }
 
     /// Compute display property based on hidden state.
