@@ -27,6 +27,30 @@ Project-specific instructions for agents working in this repo.
 - If a run exceeds ~10 minutes, treat it as potentially hung and inspect via tmux.
 - Cleanup: `tmux kill-session -t codex-shell`
 
+## Terminal screenshots
+
+Capture terminal output as PNG images using the tmux-capture skill:
+
+```bash
+# Capture an existing tmux pane (e.g., after running cargo run --example demo)
+~/.claude/skills/tmux-capture/scripts/capture.sh -t codex-shell:0.0 -o screenshot.png
+
+# Run a command and capture its output in one step
+~/.claude/skills/tmux-capture/scripts/run-and-capture.sh -d 120x40 -o output.png -- cargo run --example demo
+
+# With custom wait time for slower commands
+~/.claude/skills/tmux-capture/scripts/run-and-capture.sh -w 10 -o output.png -- cargo test
+```
+
+Options:
+- `-t TARGET` - tmux target (session:window.pane)
+- `-o OUTPUT` - output file path
+- `-d WxH` - terminal dimensions (e.g., 120x40)
+- `-w WAIT` - seconds to wait for command completion
+- `-s LINES` - scrollback lines to capture
+
+First-time setup: Run `~/.claude/skills/tmux-capture/scripts/setup.sh` to install `ansee` and configure fonts.
+
 ## Workflow for porting tests
 
 - Migrate the relevant Python tests into Rust tests first (except the first time).
