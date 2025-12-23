@@ -54,21 +54,22 @@ pub struct VerticalGroup {
 
 **Rationale**: This matches the existing code style and avoids complex trait hierarchies.
 
-### 2. Display Property for Visibility (NEW)
+### 2. Display Property for Visibility
 
-Add a `Display` enum to geometry.rs and extend LayoutHints. Display is returned directly from Widget::layout(), not from a separate Styles struct.
+**Use existing `Display` enum from `style.rs`** (line 1065-1073). Do NOT create a new Display enum - the style system already defines:
 
 ```rust
-// In geometry.rs:
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// Already exists in style.rs - DO NOT DUPLICATE:
 pub enum Display {
-    /// Widget is visible and participates in layout.
-    #[default]
-    Block,
-    /// Widget is hidden and skipped in layout (takes no space).
-    None,
+    Block,  // Normal block display (default)
+    None,   // Widget is not displayed and takes no space
 }
+```
 
+**Add `Alignment` struct to geometry.rs**:
+
+```rust
+// In geometry.rs - NEW:
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Alignment {
     pub horizontal: AlignH,
@@ -90,15 +91,21 @@ pub enum AlignV {
     Middle,
     Bottom,
 }
+```
 
-// Extend existing LayoutHints:
+**Extend existing LayoutHints** to include display and alignment:
+
+```rust
+// Extend existing LayoutHints in geometry.rs:
+use crate::style::Display;  // Import from style.rs
+
 pub struct LayoutHints {
     pub width: Constraint,
     pub height: Constraint,
     pub min_size: Option<Size>,
     pub max_size: Option<Size>,
     pub dock: Option<Dock>,
-    pub display: Display,       // NEW: Controls visibility
+    pub display: Display,       // NEW: Controls visibility (from style.rs)
     pub alignment: Alignment,   // NEW: Child alignment
 }
 
@@ -122,11 +129,7 @@ impl LayoutHints {
 }
 ```
 
-**Note on OverflowSettings**: OverflowSettings currently lives in scroll.rs. For LayoutHints to use it, either:
-1. Move OverflowSettings to geometry.rs (preferred), or
-2. Keep overflow handling in ScrollView/ScrollableContainer only
-
-For this design, we'll keep overflow in scroll.rs and handle it within ScrollView.
+**Note on OverflowSettings**: OverflowSettings currently lives in scroll.rs. Overflow handling will remain in ScrollView/ScrollableContainer only. LayoutHints does NOT include overflow - containers that need overflow control (Group containers) will use DEFAULT_CSS instead.
 
 ### 2.1 Widget Trait Extensions (NEW)
 
@@ -159,42 +162,83 @@ pub trait Widget: Any + std::fmt::Debug {
 }
 ```
 
-### 2.2 ContentSwitcher Display Override
+### 2.2 ChildDisplayOverride Trait
 
-ContentSwitcher needs to override child display. Since children are in WidgetRegistry (not stored in widgets), we use a trait for widgets that can override child display:
+ContentSwitcher and similar widgets need to override child display. Since Rust doesn't support direct trait object downcasting, we add a method to the Widget trait that returns the override interface:
 
 ```rust
-/// Trait for widgets that can override child display (like ContentSwitcher).
+// In widget.rs - add to Widget trait:
+pub trait Widget: Any + std::fmt::Debug {
+    // ... existing methods ...
+
+    /// Return display override interface if this widget controls child visibility.
+    /// Used by ContentSwitcher, TabbedContent, etc.
+    fn as_display_override(&self) -> Option<&dyn ChildDisplayOverride> {
+        None
+    }
+}
+
+/// Trait for widgets that can override child display.
+/// Implement this for widgets that control which children are visible.
 pub trait ChildDisplayOverride {
     /// Return Display for a child widget by its ID.
-    /// Returns None to use child's own display setting.
+    /// - Some(Display::Block) = child is visible
+    /// - Some(Display::None) = child is hidden
+    /// - None = use child's own display setting
     fn child_display(&self, child_id: &str) -> Option<Display>;
+
+    /// Behavior for children without IDs.
+    /// Default: non-ID children are hidden (Display::None).
+    fn non_id_child_display(&self) -> Display {
+        Display::None  // Conservative default: hide children without IDs
+    }
 }
 
 impl ChildDisplayOverride for ContentSwitcher {
     fn child_display(&self, child_id: &str) -> Option<Display> {
+        // Only the current child is visible; all others hidden
         Some(if self.current.as_deref() == Some(child_id) {
             Display::Block
         } else {
             Display::None
         })
     }
+
+    fn non_id_child_display(&self) -> Display {
+        // Children without IDs are hidden by default
+        Display::None
+    }
 }
 
+impl Widget for ContentSwitcher {
+    fn as_display_override(&self) -> Option<&dyn ChildDisplayOverride> {
+        Some(self)
+    }
+    // ... other methods ...
+}
+```
+
+**Layout integration** - get effective display using the trait properly:
+
+```rust
 // In layout.rs - get effective display for a child:
 fn get_effective_display(
     registry: &WidgetRegistry,
     parent_id: WidgetId,
     child_id: WidgetId,
 ) -> Display {
-    // Check if parent overrides child display
+    // Check if parent overrides child display via trait
     if let Some(parent) = registry.get(parent_id) {
-        if let Some(overrider) = parent.as_any().downcast_ref::<ContentSwitcher>() {
+        if let Some(overrider) = parent.as_display_override() {
             if let Some(child) = registry.get(child_id) {
+                // Child has ID - use child_display()
                 if let Some(id) = child.id() {
                     if let Some(display) = overrider.child_display(id) {
                         return display;
                     }
+                } else {
+                    // Child has no ID - use non_id_child_display()
+                    return overrider.non_id_child_display();
                 }
             }
         }
@@ -242,16 +286,31 @@ impl VerticalLayout {
 }
 ```
 
-#### 3.2 Constraint Resolution with Fraction Support
+#### 3.2 Constraint Resolution with Fraction and Min/Max Support
 
-The layout algorithm must properly handle all constraint types including Fraction. **Critical**: Fraction sizing requires a two-pass algorithm:
+The layout algorithm must properly handle all constraint types including Fraction, and respect min_size/max_size constraints. **Critical**: Fraction sizing requires a two-pass algorithm:
 
-1. **Pass 1**: Calculate fixed sizes (Length, Percentage, Auto)
-2. **Pass 2**: Distribute remaining space among Fraction constraints
+1. **Pass 1**: Calculate fixed sizes (Length, Percentage, Auto), clamp to min/max
+2. **Pass 2**: Distribute remaining space among Fraction constraints, clamp to min/max
 
 ```rust
+/// Helper to clamp a size to min/max constraints.
+fn clamp_to_minmax(size: u16, hints: &LayoutHints, is_horizontal: bool) -> u16 {
+    let min = if is_horizontal {
+        hints.min_size.map(|s| s.width).unwrap_or(0)
+    } else {
+        hints.min_size.map(|s| s.height).unwrap_or(0)
+    };
+    let max = if is_horizontal {
+        hints.max_size.map(|s| s.width).unwrap_or(u16::MAX)
+    } else {
+        hints.max_size.map(|s| s.height).unwrap_or(u16::MAX)
+    };
+    size.max(min).min(max)
+}
+
 /// Resolve constraints for a list of children on the main axis.
-/// Returns sizes for each child.
+/// Returns sizes for each child, respecting min_size and max_size.
 fn resolve_main_axis_sizes(
     registry: &WidgetRegistry,
     children: &[WidgetId],
@@ -262,7 +321,7 @@ fn resolve_main_axis_sizes(
     let mut remaining = available;
     let mut total_fr = 0.0f32;
 
-    // Pass 1: Resolve fixed constraints and tally fractions
+    // Pass 1: Resolve fixed constraints, apply min/max, and tally fractions
     for (i, &child_id) in children.iter().enumerate() {
         let Some(child) = registry.get(child_id) else { continue };
         let hints = child.layout();
@@ -270,12 +329,15 @@ fn resolve_main_axis_sizes(
 
         match constraint {
             Constraint::Length(n) => {
-                let size = n.min(remaining);
+                let size = clamp_to_minmax(n, &hints, is_horizontal);
+                let size = size.min(remaining);
                 sizes[i] = size;
                 remaining = remaining.saturating_sub(size);
             }
             Constraint::Percentage(p) => {
-                let size = ((available as f32 * p / 100.0) as u16).min(remaining);
+                let raw = (available as f32 * p / 100.0) as u16;
+                let size = clamp_to_minmax(raw, &hints, is_horizontal);
+                let size = size.min(remaining);
                 sizes[i] = size;
                 remaining = remaining.saturating_sub(size);
             }
@@ -285,7 +347,8 @@ fn resolve_main_axis_sizes(
                 } else {
                     child.get_content_height()
                 };
-                let size = content.min(remaining);
+                let size = clamp_to_minmax(content, &hints, is_horizontal);
+                let size = size.min(remaining);
                 sizes[i] = size;
                 remaining = remaining.saturating_sub(size);
             }
@@ -296,7 +359,7 @@ fn resolve_main_axis_sizes(
         }
     }
 
-    // Pass 2: Distribute remaining space among fractions
+    // Pass 2: Distribute remaining space among fractions, respecting min/max
     if total_fr > 0.0 && remaining > 0 {
         let per_fr = remaining as f32 / total_fr;
 
@@ -306,7 +369,8 @@ fn resolve_main_axis_sizes(
             let constraint = if is_horizontal { hints.width } else { hints.height };
 
             if let Constraint::Fraction(fr) = constraint {
-                sizes[i] = (fr * per_fr).round() as u16;
+                let raw = (fr * per_fr).round() as u16;
+                sizes[i] = clamp_to_minmax(raw, &hints, is_horizontal);
             }
         }
     }
@@ -561,13 +625,26 @@ impl Widget for Right {
 
 #### 4.2 Group Containers
 
+Group containers shrink to content height. Overflow is handled via DEFAULT_CSS (not LayoutHints) since overflow stays in scroll.rs:
+
 ```rust
 /// Vertical layout that shrinks to content height.
+/// DEFAULT_CSS applies overflow: hidden hidden.
 pub struct VerticalGroup {
     inner: Container,
 }
 
 impl VerticalGroup {
+    /// DEFAULT_CSS for VerticalGroup.
+    /// Overflow is hidden (no scrolling) - content is clipped.
+    pub const DEFAULT_CSS: &'static str = r#"
+        VerticalGroup {
+            width: 1fr;
+            height: auto;
+            overflow: hidden hidden;
+        }
+    "#;
+
     pub fn new() -> Self {
         Self {
             inner: Container::new()
@@ -584,16 +661,27 @@ impl Widget for VerticalGroup {
 
     fn layout(&self) -> LayoutHints {
         self.inner.layout()
-            .with_overflow(OverflowSettings::both(Overflow::Hidden))
+        // Note: Overflow is applied via DEFAULT_CSS, not LayoutHints
     }
 }
 
 /// Horizontal layout that shrinks to content height.
+/// DEFAULT_CSS applies overflow: hidden hidden.
 pub struct HorizontalGroup {
     inner: Container,
 }
 
 impl HorizontalGroup {
+    /// DEFAULT_CSS for HorizontalGroup.
+    /// Overflow is hidden (no scrolling) - content is clipped.
+    pub const DEFAULT_CSS: &'static str = r#"
+        HorizontalGroup {
+            width: 1fr;
+            height: auto;
+            overflow: hidden hidden;
+        }
+    "#;
+
     pub fn new() -> Self {
         Self {
             inner: Container::new()
@@ -610,7 +698,7 @@ impl Widget for HorizontalGroup {
 
     fn layout(&self) -> LayoutHints {
         self.inner.layout()
-            .with_overflow(OverflowSettings::both(Overflow::Hidden))
+        // Note: Overflow is applied via DEFAULT_CSS, not LayoutHints
     }
 }
 ```
@@ -765,6 +853,13 @@ impl ScrollableContainer {
             view: ScrollView::new(),
             bindings,
         }
+    }
+
+    /// Set overflow settings (delegated to inner ScrollView).
+    /// Note: OverflowSettings lives in scroll.rs, not LayoutHints.
+    pub fn with_overflow(mut self, overflow: OverflowSettings) -> Self {
+        self.view = self.view.with_overflow(overflow);
+        self
     }
 }
 
@@ -1502,23 +1597,44 @@ impl Widget for TabPane {
 
 #### 7.6 TabbedContent Widget
 
+**IMPORTANT**: Composite widgets store **logical state only**, not child widget instances.
+Children are created in compose() and added to the registry. The parent accesses
+children via registry when needed. This avoids the clone-divergence problem.
+
 ```rust
 /// Prefix for content tab IDs.
 const CONTENT_TAB_PREFIX: &str = "--content-tab-";
 
+/// Configuration for a pane (stored in TabbedContent, not the widget itself).
+#[derive(Clone)]
+struct PaneConfig {
+    id: String,
+    title: String,
+    disabled: bool,
+    hidden: bool,
+}
+
 /// Container with tabs and switchable content panes.
+/// Stores logical state; children are created in compose().
 pub struct TabbedContent {
     id: Option<String>,
-    tabs: Tabs,
-    switcher: ContentSwitcher,
+    /// Pane configurations (NOT TabPane widgets).
+    panes: Vec<PaneConfig>,
+    /// Currently active pane ID (not tab ID).
+    active_id: Option<String>,
+    /// Child widget IDs (set after compose runs).
+    tabs_id: Option<WidgetId>,
+    switcher_id: Option<WidgetId>,
 }
 
 impl TabbedContent {
     pub fn new() -> Self {
         Self {
             id: None,
-            tabs: Tabs::new(),
-            switcher: ContentSwitcher::new(),
+            panes: Vec::new(),
+            active_id: None,
+            tabs_id: None,
+            switcher_id: None,
         }
     }
 
@@ -1527,82 +1643,85 @@ impl TabbedContent {
         self
     }
 
-    /// Get active pane ID (without prefix).
+    /// Get active pane ID.
     pub fn active(&self) -> Option<&str> {
-        self.tabs.active().and_then(|tab_id| {
-            tab_id.strip_prefix(CONTENT_TAB_PREFIX)
+        self.active_id.as_deref()
+    }
+
+    /// Set active pane by pane ID.
+    /// Returns message to propagate. Call request_recompose() after.
+    pub fn set_active(&mut self, pane_id: impl Into<String>) -> Option<TabActivated> {
+        let pane_id = pane_id.into();
+        let previous = self.active_id.take();
+        self.active_id = Some(pane_id.clone());
+        Some(TabActivated {
+            tab_id: pane_id,
+            previous,
         })
     }
 
-    /// Set active pane by pane ID (not tab ID).
-    pub fn set_active(&mut self, pane_id: impl Into<String>) -> Option<TabActivated> {
-        let pane_id = pane_id.into();
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-
-        let result = self.tabs.set_active(&tab_id);
-        if result.is_some() {
-            self.switcher.set_current(Some(pane_id));
+    /// Add a pane configuration.
+    pub fn add_pane(&mut self, id: impl Into<String>, title: impl Into<String>) {
+        self.panes.push(PaneConfig {
+            id: id.into(),
+            title: title.into(),
+            disabled: false,
+            hidden: false,
+        });
+        // First pane becomes active by default
+        if self.active_id.is_none() {
+            self.active_id = Some(self.panes.last().unwrap().id.clone());
         }
-        result
     }
 
-    /// Add a pane.
-    /// Panics if pane has empty ID.
-    pub fn add_pane(&mut self, pane: TabPane) {
-        let pane_id = pane.id().to_string();
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-
-        let tab = Tab::new(&tab_id, pane.title())
-            .with_disabled(pane.is_disabled());
-
-        self.tabs.add_tab(tab);
-        self.switcher.add_content(&pane_id, false);
-    }
-
-    /// Remove a pane by pane ID.
+    /// Remove a pane by ID.
     pub fn remove_pane(&mut self, pane_id: &str) {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.remove_tab(&tab_id);
+        self.panes.retain(|p| p.id != pane_id);
+        if self.active_id.as_deref() == Some(pane_id) {
+            self.active_id = self.panes.first().map(|p| p.id.clone());
+        }
     }
 
     /// Clear all panes.
     pub fn clear_panes(&mut self) {
-        self.tabs.clear();
-        self.switcher.set_current(None);
-    }
-
-    /// Get a tab by pane ID (uses prefix internally).
-    pub fn get_tab(&self, pane_id: &str) -> Option<&Tab> {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.tabs.iter().find(|t| t.id() == tab_id)
+        self.panes.clear();
+        self.active_id = None;
     }
 
     /// Disable a tab by pane ID.
     pub fn disable_tab(&mut self, pane_id: &str) {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.disable(&tab_id);
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
+            pane.disabled = true;
+        }
     }
 
     /// Enable a tab by pane ID.
     pub fn enable_tab(&mut self, pane_id: &str) {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.enable(&tab_id);
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
+            pane.disabled = false;
+        }
     }
 
     /// Hide a tab by pane ID.
     pub fn hide_tab(&mut self, pane_id: &str) {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.hide(&tab_id);
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
+            pane.hidden = true;
+        }
     }
 
     /// Show a tab by pane ID.
     pub fn show_tab(&mut self, pane_id: &str) {
-        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
-        self.tabs.show(&tab_id);
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
+            pane.hidden = false;
+        }
     }
 }
 
 impl Widget for TabbedContent {
+    fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
     fn layout(&self) -> LayoutHints {
         LayoutHints::default()
             .with_height(Constraint::Auto)
@@ -1617,35 +1736,56 @@ impl Widget for TabbedContent {
     }
 }
 
-/// TabbedContent uses the Compose trait to build its child tree.
-/// Structure: Tabs (docked top) + ContentSwitcher
+/// TabbedContent creates children from logical state in compose().
+/// Children are added to registry; this avoids clone-divergence.
 impl Compose for TabbedContent {
     fn compose(&self, ctx: &mut ComposeContext) {
-        // Add Tabs widget (with dock hint for top positioning)
-        let tabs = self.tabs.clone();
+        // Build Tabs widget from pane configs
+        let mut tabs = Tabs::new();
+        for pane in &self.panes {
+            let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane.id);
+            let mut tab = Tab::new(&tab_id, &pane.title);
+            if pane.disabled {
+                tab = tab.with_disabled(true);
+            }
+            if pane.hidden {
+                tab.set_hidden(true);
+            }
+            tabs.add_tab(tab);
+        }
+        if let Some(active) = &self.active_id {
+            let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, active);
+            tabs.set_active(&tab_id);
+        }
         ctx.add(tabs);
 
-        // Add ContentSwitcher that manages pane visibility
-        // TabPanes are added as children of the switcher
-        ctx.add(self.switcher.clone());
+        // Build ContentSwitcher with active pane
+        let mut switcher = ContentSwitcher::new();
+        switcher.set_current(self.active_id.clone());
+        ctx.add(switcher);
+
+        // Note: TabPane widgets are added to switcher externally via add_with()
+        // See usage pattern below.
     }
 }
 
-// Note: TabbedContent uses layout_type() = Vertical to stack children.
-// The Tabs widget renders at its natural height (2 rows).
-// ContentSwitcher fills remaining space and shows only the active pane.
+// Usage pattern for adding panes with content:
 //
-// Rendering is handled by the framework's layout/render pass, not manually.
-// Each child widget's render() is called with its computed area.
+// ctx.add_with(TabbedContent::new(), |ctx| {
+//     ctx.add(TabPane::new("tab1", "First Tab").with_children(...));
+//     ctx.add(TabPane::new("tab2", "Second Tab").with_children(...));
+// });
+//
+// TabbedContent.add_pane() stores config; actual TabPane widgets are external.
 
 // Message handling for tab activation
 impl TabbedContent {
     /// Handle TabActivated message from Tabs.
-    /// Syncs ContentSwitcher to show corresponding pane.
+    /// Updates active_id and triggers recompose.
     pub fn on_tab_activated(&mut self, msg: &TabActivated) -> Option<TabActivated> {
         // Extract pane ID from tab ID (remove prefix)
         if let Some(pane_id) = msg.tab_id.strip_prefix(CONTENT_TAB_PREFIX) {
-            self.switcher.set_current(Some(pane_id.to_string()));
+            self.active_id = Some(pane_id.to_string());
 
             // Forward the message with the pane ID
             Some(TabActivated {
@@ -1793,12 +1933,13 @@ impl Widget for Contents {
 }
 
 /// Collapsible container with toggle header.
-/// Composed of CollapsibleTitle + Contents.
+/// Stores logical state only; children are created in compose().
 pub struct Collapsible {
     id: Option<String>,
-    title: CollapsibleTitle,
-    contents: Contents,
-    collapsed: bool,  // Default: true (starts collapsed)
+    /// Title text (NOT CollapsibleTitle widget).
+    title_text: String,
+    /// Collapsed state (default: true).
+    collapsed: bool,
 }
 
 /// Collapsible toggled message.
@@ -1811,8 +1952,7 @@ impl Collapsible {
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             id: None,
-            title: CollapsibleTitle::new(title),
-            contents: Contents::new(),
+            title_text: title.into(),
             collapsed: true,  // Default collapsed per Python Textual
         }
     }
@@ -1825,28 +1965,21 @@ impl Collapsible {
     /// Set initial collapsed state (default: true).
     pub fn with_collapsed(mut self, collapsed: bool) -> Self {
         self.collapsed = collapsed;
-        self.sync_state();
         self
     }
 
-    fn sync_state(&mut self) {
-        self.title.set_collapsed(self.collapsed);
-        self.contents.set_visible(!self.collapsed);
-    }
-
     pub fn title(&self) -> &str {
-        &self.title.title
+        &self.title_text
     }
 
     pub fn is_collapsed(&self) -> bool {
         self.collapsed
     }
 
-    /// Expand the collapsible.
+    /// Expand the collapsible. Returns message; call request_recompose() after.
     pub fn expand(&mut self) -> Option<Toggled> {
         if self.collapsed {
             self.collapsed = false;
-            self.sync_state();
             Some(Toggled {
                 collapsible_id: self.id.clone(),
                 collapsed: false,
@@ -1856,11 +1989,10 @@ impl Collapsible {
         }
     }
 
-    /// Collapse the collapsible.
+    /// Collapse the collapsible. Returns message; call request_recompose() after.
     pub fn collapse(&mut self) -> Option<Toggled> {
         if !self.collapsed {
             self.collapsed = true;
-            self.sync_state();
             Some(Toggled {
                 collapsible_id: self.id.clone(),
                 collapsed: true,
@@ -1870,10 +2002,9 @@ impl Collapsible {
         }
     }
 
-    /// Toggle collapsed state.
+    /// Toggle collapsed state. Returns message; call request_recompose() after.
     pub fn toggle(&mut self) -> Toggled {
         self.collapsed = !self.collapsed;
-        self.sync_state();
         Toggled {
             collapsible_id: self.id.clone(),
             collapsed: self.collapsed,
@@ -1896,42 +2027,41 @@ impl Widget for Collapsible {
         Some(LayoutType::Vertical)
     }
 
-    fn get_content_height(&self) -> u16 {
-        let title_height = self.title.get_content_height();
-        if self.collapsed {
-            title_height
-        } else {
-            title_height + self.contents.get_content_height()
-        }
-    }
-
     fn widget_type_name(&self) -> &'static str {
         "Collapsible"
     }
 }
 
-/// Collapsible uses the Compose trait to build its child tree.
-/// Structure: CollapsibleTitle + Contents (vertical layout)
+/// Collapsible creates children from logical state in compose().
+/// Children are added to registry; this avoids clone-divergence.
 impl Compose for Collapsible {
     fn compose(&self, ctx: &mut ComposeContext) {
-        // Add title widget (always visible, focusable)
-        ctx.add(self.title.clone());
+        // Create title widget from state
+        let mut title = CollapsibleTitle::new(&self.title_text);
+        title.set_collapsed(self.collapsed);
+        ctx.add(title);
 
-        // Add contents widget (has display: none when collapsed)
-        // The Contents widget handles its own display state via layout()
-        ctx.add(self.contents.clone());
+        // Create contents widget with proper display state
+        let mut contents = Contents::new();
+        contents.set_visible(!self.collapsed);
+        ctx.add(contents);
+
+        // Note: Actual content widgets are added to Contents externally via add_with()
     }
 }
 
-// Note: Collapsible uses layout_type() = Vertical to stack children.
-// CollapsibleTitle renders the arrow and title text.
-// Contents returns display: none in layout() when collapsed,
-// so the layout system automatically skips it.
+// Usage pattern:
+//
+// ctx.add_with(Collapsible::new("Section Title"), |ctx| {
+//     ctx.add(Label::new("Content inside the collapsible"));
+//     ctx.add(Button::new("Click me"));
+// });
 
 // Message flow for toggle action
 impl Collapsible {
     /// Handle toggle action from CollapsibleTitle.
     /// Called when Enter is pressed on the focused title.
+    /// After calling this, request_recompose() to update the tree.
     pub fn on_title_toggle(&mut self) -> Toggled {
         self.toggle()
     }
@@ -1940,7 +2070,7 @@ impl Collapsible {
 
 ### 9. Widget Trait Extension Summary
 
-All Widget trait extensions are defined in **Section 2.1**. This section summarizes the new APIs:
+All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. This section summarizes the new APIs:
 
 | Method | Return Type | Purpose |
 |--------|-------------|---------|
@@ -1948,6 +2078,7 @@ All Widget trait extensions are defined in **Section 2.1**. This section summari
 | `get_content_width()` | `u16` | Content width for `Constraint::Auto` sizing |
 | `get_content_height()` | `u16` | Content height for `Constraint::Auto` sizing |
 | `grid_config()` | `Option<&GridConfig>` | Grid configuration for ItemGrid |
+| `as_display_override()` | `Option<&dyn ChildDisplayOverride>` | Display override for child widgets |
 
 All methods have default implementations returning `None` or `0`, making them opt-in.
 
@@ -1955,6 +2086,7 @@ All methods have default implementations returning `None` or `0`, making them op
 - Widgets with IDs must implement `id()` (ContentSwitcher, TabbedContent panes)
 - Widgets using `Constraint::Auto` should implement `get_content_*()` methods
 - ItemGrid must implement `grid_config()` to return its computed configuration
+- Widgets that control child visibility must implement `as_display_override()` (ContentSwitcher)
 
 ### 10. File Organization
 
@@ -2000,18 +2132,20 @@ CollapsibleTitle, Contents (new)
 ### 12. Implementation Order
 
 1. **Core Extensions** (Required First)
-   - Add `Display` enum to geometry.rs
+   - Use existing `Display` enum from style.rs (do NOT duplicate)
    - Add `Alignment` struct (AlignH, AlignV) to geometry.rs
    - Extend `LayoutHints` with display and alignment fields
-   - Add Widget trait methods (see Section 2.1):
+   - Add Widget trait methods (see Sections 2.1 and 2.2):
      - `id()` → `Option<&str>`
      - `get_content_width()` → `u16`
      - `get_content_height()` → `u16`
      - `grid_config()` → `Option<&GridConfig>`
+     - `as_display_override()` → `Option<&dyn ChildDisplayOverride>`
    - Add `ChildDisplayOverride` trait to layout.rs
    - Update layout algorithms:
      - Filter `display: none` widgets via `get_effective_display()`
      - Two-pass constraint resolution for Fraction support
+     - Apply min_size/max_size clamping
      - Apply alignment after fraction resolution
 
 2. **Alignment Containers** (Simple)
