@@ -281,21 +281,29 @@ ComposeContext needs an additional method to support CloneableWidget. This requi
 // In widget.rs - extend WidgetRegistry:
 
 impl WidgetRegistry {
-    // Existing methods: add(), set_parent(), get_children(), etc.
+    // Existing add() for reference:
+    // pub fn add(&mut self, widget: impl Widget) -> WidgetId {
+    //     let id = self.widgets.insert(Box::new(widget));
+    //     self.nodes.insert_with_key(|id| TreeNode::new(id));
+    //     id
+    // }
 
     /// Add a boxed widget that implements CloneableWidget.
+    /// Mirrors add() behavior: inserts into both widgets and nodes SlotMaps.
     /// Used by ComposeContext::add_cloneable for dynamic widget types.
     pub fn add_boxed(&mut self, widget: Box<dyn CloneableWidget>) -> WidgetId {
-        // Box<dyn CloneableWidget> implements Widget via supertrait
-        // Store in the registry like any other widget
-        let id = self.next_id();
-        self.widgets.insert(id, Box::new(BoxedCloneableWrapper(widget)));
+        // Wrap the CloneableWidget so we can store it as Box<dyn Widget>
+        let wrapped: Box<dyn Widget> = Box::new(BoxedCloneableWrapper(widget));
+        // Insert into widgets SlotMap (returns the WidgetId key)
+        let id = self.widgets.insert(wrapped);
+        // Create corresponding TreeNode entry (mirrors add() behavior)
+        self.nodes.insert_with_key(|_| TreeNode::new(id));
         id
     }
 }
 
 /// Wrapper to store Box<dyn CloneableWidget> in the registry.
-/// Implements Widget by delegating to the inner widget.
+/// Implements Widget by delegating all methods to the inner widget.
 struct BoxedCloneableWrapper(Box<dyn CloneableWidget>);
 
 impl std::fmt::Debug for BoxedCloneableWrapper {
@@ -313,11 +321,34 @@ impl Widget for BoxedCloneableWrapper {
         self.0.layout()
     }
 
+    fn layout_type(&self) -> Option<LayoutType> {
+        self.0.layout_type()
+    }
+
+    fn focusable(&self) -> bool {
+        self.0.focusable()
+    }
+
     fn id(&self) -> Option<&str> {
         self.0.id()
     }
 
-    // Delegate other Widget methods to self.0...
+    fn as_any(&self) -> &dyn Any {
+        // Return the wrapper's Any, not the inner widget's
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        self.0.widget_type_name()
+    }
+
+    fn on_message(&mut self, msg: &dyn Any) -> bool {
+        self.0.on_message(msg)
+    }
 }
 ```
 
@@ -1709,6 +1740,12 @@ impl TabPane {
 }
 
 impl Widget for TabPane {
+    /// No-op render: TabPane is a container, children render via layout.
+    fn render(&self, _area: Rect, _frame: &mut Frame) {
+        // Container widgets don't render themselves; their children
+        // are rendered by the layout system after compose().
+    }
+
     /// Return the pane ID for ContentSwitcher visibility coordination.
     fn id(&self) -> Option<&str> {
         Some(&self.id)
@@ -1723,8 +1760,36 @@ impl Widget for TabPane {
         Some(LayoutType::Vertical)
     }
 
+    /// Content height is sum of children's heights (for Auto constraint).
+    /// Called by layout system to determine pane size.
+    fn get_content_height(&self) -> u16 {
+        // Sum heights of all content widgets
+        // Note: In practice, this is calculated after compose() runs
+        // and children are in the registry. For estimation, we use
+        // the stored widgets' get_content_height().
+        self.content.iter()
+            .map(|w| w.get_content_height())
+            .sum()
+    }
+
+    /// Content width is max of children's widths (for Auto constraint).
+    fn get_content_width(&self) -> u16 {
+        self.content.iter()
+            .map(|w| w.get_content_width())
+            .max()
+            .unwrap_or(0)
+    }
+
     fn widget_type_name(&self) -> &'static str {
         "TabPane"
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
