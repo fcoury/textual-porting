@@ -334,12 +334,12 @@ impl Widget for BoxedCloneableWrapper {
     }
 
     fn as_any(&self) -> &dyn Any {
-        // Return the wrapper's Any, not the inner widget's
-        self
+        // Delegate to inner widget for proper downcasting (query.rs, grid_config lookups)
+        self.0.as_any()
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+        self.0.as_any_mut()
     }
 
     fn widget_type_name(&self) -> &'static str {
@@ -436,7 +436,49 @@ impl VerticalLayout {
 }
 ```
 
-#### 3.2 Constraint Resolution with Fraction and Min/Max Support
+#### 3.2 Layout Dispatch and Grid Config Integration
+
+The layout system dispatches to the appropriate algorithm based on `layout_type()`. **Critical**: For `LayoutType::Grid`, the system must use `widget.grid_config()` to get the widget's configuration:
+
+```rust
+// In layout.rs - layout dispatch:
+
+/// Perform layout for a widget and its children.
+pub fn layout_widget(
+    registry: &WidgetRegistry,
+    widget_id: WidgetId,
+    area: Rect,
+) -> HashMap<WidgetId, Rect> {
+    let widget = registry.get(widget_id).expect("widget exists");
+
+    match widget.layout_type() {
+        Some(LayoutType::Vertical) => {
+            VerticalLayout::new().layout(registry, widget_id, area)
+        }
+        Some(LayoutType::Horizontal) => {
+            HorizontalLayout::new().layout(registry, widget_id, area)
+        }
+        Some(LayoutType::Grid) => {
+            // CRITICAL: Use widget's grid_config or fallback to default
+            let config = widget.grid_config()
+                .cloned()
+                .unwrap_or_default();
+            GridLayout::new(config).layout(registry, widget_id, area)
+        }
+        None => {
+            // Leaf widget or default behavior - no children to layout
+            HashMap::new()
+        }
+    }
+}
+```
+
+This ensures:
+- `ItemGrid` and wrapped Grid widgets in `CloneableWidget` content use their custom config
+- Widgets without explicit `grid_config()` fall back to `GridConfig::default()`
+- The `BoxedCloneableWrapper` delegates `grid_config()` to the inner widget (Section 2.4)
+
+#### 3.3 Constraint Resolution with Fraction and Min/Max Support
 
 The layout algorithm must properly handle all constraint types including Fraction, and respect min_size/max_size constraints. **Critical**: Fraction sizing requires a two-pass algorithm:
 
@@ -529,7 +571,7 @@ fn resolve_main_axis_sizes(
 }
 ```
 
-#### 3.3 Alignment with Proper Fraction Handling
+#### 3.4 Alignment with Proper Fraction Handling
 
 Alignment must work after fractions are resolved. The layout calculates the total used size (which may be less than available if no fractions), then applies alignment:
 
@@ -1862,7 +1904,8 @@ pub struct TabbedContent {
     panes: Vec<TabPane>,
     /// Currently active pane ID.
     active_id: Option<String>,
-    /// Tab disabled/hidden state (separate from TabPane).
+    /// Tab disabled/hidden state. Disabled is synced from/to TabPane.disabled;
+    /// hidden is Tab-only (TabPane doesn't have hidden state).
     tab_states: HashMap<String, TabState>,
 }
 
@@ -1888,13 +1931,18 @@ impl TabbedContent {
     }
 
     /// Add a TabPane widget. The pane is stored and placed under ContentSwitcher
-    /// during compose().
+    /// during compose(). Tab state is synced from TabPane's disabled property.
     pub fn with_pane(mut self, pane: TabPane) -> Self {
         let pane_id = pane.pane_id().to_string();  // TabPane always has ID
         if self.active_id.is_none() {
             self.active_id = Some(pane_id.clone());
         }
-        self.tab_states.entry(pane_id).or_default();
+        // Sync tab state from TabPane's disabled property
+        let state = TabState {
+            disabled: pane.is_disabled(),
+            hidden: false,
+        };
+        self.tab_states.insert(pane_id, state);
         self.panes.push(pane);
         self
     }
@@ -1915,17 +1963,25 @@ impl TabbedContent {
         })
     }
 
-    /// Disable a tab by pane ID.
+    /// Disable a tab by pane ID. Syncs to both tab_states and TabPane.
     pub fn disable_tab(&mut self, pane_id: &str) {
         if let Some(state) = self.tab_states.get_mut(pane_id) {
             state.disabled = true;
         }
+        // Sync to TabPane's disabled field
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.pane_id() == pane_id) {
+            pane.set_disabled(true);
+        }
     }
 
-    /// Enable a tab by pane ID.
+    /// Enable a tab by pane ID. Syncs to both tab_states and TabPane.
     pub fn enable_tab(&mut self, pane_id: &str) {
         if let Some(state) = self.tab_states.get_mut(pane_id) {
             state.disabled = false;
+        }
+        // Sync to TabPane's disabled field
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.pane_id() == pane_id) {
+            pane.set_disabled(false);
         }
     }
 
