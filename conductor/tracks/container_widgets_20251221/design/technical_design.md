@@ -56,7 +56,7 @@ pub struct VerticalGroup {
 
 ### 2. Display Property for Visibility (NEW)
 
-Add a `Display` enum to control widget visibility in layout. This integrates with the existing style system.
+Add a `Display` enum to geometry.rs and extend LayoutHints. Display is returned directly from Widget::layout(), not from a separate Styles struct.
 
 ```rust
 // In geometry.rs:
@@ -69,226 +69,6 @@ pub enum Display {
     None,
 }
 
-// In styles.rs - extend Styles:
-pub struct Styles {
-    // ... existing fields ...
-    pub display: Display,  // NEW: Controls visibility and layout participation
-}
-
-impl Styles {
-    pub fn with_display(mut self, display: Display) -> Self {
-        self.display = display;
-        self
-    }
-}
-
-// Extend LayoutHints to include computed display:
-pub struct LayoutHints {
-    pub width: Constraint,
-    pub height: Constraint,
-    pub min_size: Option<Size>,
-    pub max_size: Option<Size>,
-    pub dock: Option<Dock>,
-    pub display: Display,       // NEW: Computed from styles or overridden
-    pub alignment: Alignment,   // NEW: Child alignment
-    pub overflow: OverflowSettings, // NEW: Scroll overflow control
-}
-
-impl LayoutHints {
-    /// Set display mode.
-    pub fn with_display(mut self, display: Display) -> Self {
-        self.display = display;
-        self
-    }
-
-    /// Set overflow settings.
-    pub fn with_overflow(mut self, overflow: OverflowSettings) -> Self {
-        self.overflow = overflow;
-        self
-    }
-
-    /// Check if widget should be included in layout.
-    pub fn is_visible(&self) -> bool {
-        self.display != Display::None
-    }
-}
-
-// Widget trait method to compute display (can be overridden):
-pub trait Widget {
-    // ... existing methods ...
-
-    /// Get the computed display for this widget.
-    /// Default implementation reads from styles.
-    fn computed_display(&self) -> Display {
-        self.styles().display
-    }
-}
-```
-
-**Integration with ContentSwitcher:**
-
-ContentSwitcher overrides children's display via the parent-child layout relationship:
-
-```rust
-impl ContentSwitcher {
-    /// Called during layout to get child's effective display.
-    /// The layout algorithm queries this before laying out each child.
-    pub fn child_display(&self, child_id: &str) -> Display {
-        if self.current.as_deref() == Some(child_id) {
-            Display::Block
-        } else {
-            Display::None
-        }
-    }
-}
-
-// In layout.rs - layout algorithm queries parent for child display override:
-fn get_child_display(parent: &dyn Widget, child: &dyn Widget) -> Display {
-    // Check if parent overrides child display (e.g., ContentSwitcher)
-    if let Some(switcher) = parent.as_content_switcher() {
-        if let Some(child_id) = child.id() {
-            return switcher.child_display(child_id);
-        }
-    }
-    // Default: use child's own computed display
-    child.computed_display()
-}
-```
-
-### 3. Layout System Integration
-
-#### 3.1 Layout Filtering for Display::None
-
-All layout algorithms must skip widgets with `display: none`. The filtering uses the parent's `child_display()` method when available (for ContentSwitcher), otherwise falls back to the child's own display:
-
-```rust
-// In layout.rs - modify layout functions:
-
-impl VerticalLayout {
-    pub fn layout(
-        &self,
-        parent: &dyn Widget,
-        children: &[&dyn Widget],
-        area: Rect,
-    ) -> Vec<Rect> {
-        // Filter out hidden children, checking parent override first
-        let visible_children: Vec<_> = children
-            .iter()
-            .filter(|c| get_child_display(parent, *c) != Display::None)
-            .collect();
-
-        // Layout only visible children
-        self.layout_visible(parent, &visible_children, area)
-    }
-}
-
-impl HorizontalLayout {
-    pub fn layout(
-        &self,
-        parent: &dyn Widget,
-        children: &[&dyn Widget],
-        area: Rect,
-    ) -> Vec<Rect> {
-        let visible_children: Vec<_> = children
-            .iter()
-            .filter(|c| get_child_display(parent, *c) != Display::None)
-            .collect();
-
-        self.layout_visible(parent, &visible_children, area)
-    }
-}
-
-impl GridLayout {
-    pub fn layout(
-        &self,
-        parent: &dyn Widget,
-        children: &[&dyn Widget],
-        area: Rect,
-    ) -> Vec<Rect> {
-        let visible_children: Vec<_> = children
-            .iter()
-            .filter(|c| get_child_display(parent, *c) != Display::None)
-            .collect();
-
-        self.layout_visible(parent, &visible_children, area)
-    }
-}
-```
-
-#### 3.2 Constraint::Auto and Content Size Calculation
-
-`Constraint::Auto` means "size based on content". Layout algorithms must query widgets for their content size:
-
-```rust
-// In widget.rs - add content size methods:
-pub trait Widget {
-    // ... existing methods ...
-
-    /// Get the minimum content width (for Auto constraint).
-    /// Default: 0 (no minimum).
-    fn get_content_width(&self) -> u16 {
-        0
-    }
-
-    /// Get the minimum content height (for Auto constraint).
-    /// Default: 0 (no minimum).
-    fn get_content_height(&self) -> u16 {
-        0
-    }
-}
-
-// Example implementations:
-impl Widget for Label {
-    fn get_content_width(&self) -> u16 {
-        self.text.len() as u16
-    }
-
-    fn get_content_height(&self) -> u16 {
-        1  // Single line
-    }
-}
-
-impl Widget for Container {
-    fn get_content_width(&self) -> u16 {
-        // Sum children widths for horizontal, max for vertical
-        self.children.iter()
-            .map(|c| c.get_content_width())
-            .max()
-            .unwrap_or(0)
-    }
-
-    fn get_content_height(&self) -> u16 {
-        // Sum children heights for vertical, max for horizontal
-        self.children.iter()
-            .map(|c| c.get_content_height())
-            .sum()
-    }
-}
-
-// In layout.rs - resolve Auto constraint:
-fn resolve_constraint(constraint: Constraint, available: u16, content_size: u16) -> u16 {
-    match constraint {
-        Constraint::Length(n) => n.min(available),
-        Constraint::Percentage(p) => ((available as f32 * p / 100.0) as u16).min(available),
-        Constraint::Fraction(f) => {
-            // Fraction is relative to remaining space after fixed/auto
-            // Handled separately in layout algorithm
-            0  // Placeholder, actual calculation in layout
-        }
-        Constraint::Auto => content_size.min(available),
-    }
-}
-```
-
-#### 3.3 Alignment Handling in Layout
-
-Alignment containers set hints that layout algorithms honor. **Critical**: Alignment must work correctly for both single-child and multi-child layouts:
-
-- **Main axis alignment**: Offsets the *entire group* of children as a unit
-- **Cross axis alignment**: Aligns each child individually within its allocated slot
-
-```rust
-// In geometry.rs:
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Alignment {
     pub horizontal: AlignH,
@@ -310,70 +90,284 @@ pub enum AlignV {
     Middle,
     Bottom,
 }
+
+// Extend existing LayoutHints:
+pub struct LayoutHints {
+    pub width: Constraint,
+    pub height: Constraint,
+    pub min_size: Option<Size>,
+    pub max_size: Option<Size>,
+    pub dock: Option<Dock>,
+    pub display: Display,       // NEW: Controls visibility
+    pub alignment: Alignment,   // NEW: Child alignment
+}
+
+impl LayoutHints {
+    /// Set display mode.
+    pub fn with_display(mut self, display: Display) -> Self {
+        self.display = display;
+        self
+    }
+
+    /// Set alignment.
+    pub fn with_alignment(mut self, alignment: Alignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+
+    /// Check if widget should be included in layout.
+    pub fn is_visible(&self) -> bool {
+        self.display != Display::None
+    }
+}
 ```
 
-Layout algorithms apply alignment correctly for multi-child layouts:
+**Note on OverflowSettings**: OverflowSettings currently lives in scroll.rs. For LayoutHints to use it, either:
+1. Move OverflowSettings to geometry.rs (preferred), or
+2. Keep overflow handling in ScrollView/ScrollableContainer only
+
+For this design, we'll keep overflow in scroll.rs and handle it within ScrollView.
+
+### 2.1 Widget Trait Extensions (NEW)
+
+Add new methods to the Widget trait in widget.rs:
 
 ```rust
-// In layout.rs:
+pub trait Widget: Any + std::fmt::Debug {
+    // ... existing methods ...
+
+    /// Return the widget's string ID, if set.
+    /// Used for ID-based lookups and display override coordination.
+    fn id(&self) -> Option<&str> {
+        None
+    }
+
+    /// Get minimum content width for Auto constraint sizing.
+    fn get_content_width(&self) -> u16 {
+        0
+    }
+
+    /// Get minimum content height for Auto constraint sizing.
+    fn get_content_height(&self) -> u16 {
+        0
+    }
+
+    /// Return grid configuration if this widget uses grid layout.
+    fn grid_config(&self) -> Option<&GridConfig> {
+        None
+    }
+}
+```
+
+### 2.2 ContentSwitcher Display Override
+
+ContentSwitcher needs to override child display. Since children are in WidgetRegistry (not stored in widgets), we use a trait for widgets that can override child display:
+
+```rust
+/// Trait for widgets that can override child display (like ContentSwitcher).
+pub trait ChildDisplayOverride {
+    /// Return Display for a child widget by its ID.
+    /// Returns None to use child's own display setting.
+    fn child_display(&self, child_id: &str) -> Option<Display>;
+}
+
+impl ChildDisplayOverride for ContentSwitcher {
+    fn child_display(&self, child_id: &str) -> Option<Display> {
+        Some(if self.current.as_deref() == Some(child_id) {
+            Display::Block
+        } else {
+            Display::None
+        })
+    }
+}
+
+// In layout.rs - get effective display for a child:
+fn get_effective_display(
+    registry: &WidgetRegistry,
+    parent_id: WidgetId,
+    child_id: WidgetId,
+) -> Display {
+    // Check if parent overrides child display
+    if let Some(parent) = registry.get(parent_id) {
+        if let Some(overrider) = parent.as_any().downcast_ref::<ContentSwitcher>() {
+            if let Some(child) = registry.get(child_id) {
+                if let Some(id) = child.id() {
+                    if let Some(display) = overrider.child_display(id) {
+                        return display;
+                    }
+                }
+            }
+        }
+    }
+    // Default: use child's own layout hints
+    registry.get(child_id)
+        .map(|w| w.layout().display)
+        .unwrap_or(Display::Block)
+}
+```
+
+### 3. Layout System Integration
+
+#### 3.1 Layout Filtering for Display::None
+
+Layout algorithms work with the WidgetRegistry to get children and filter by display. The layout system uses WidgetId, not widget references:
+
+```rust
+// In layout.rs - layout filtering with registry:
+
+/// Get visible children for a parent widget.
+fn get_visible_children(
+    registry: &WidgetRegistry,
+    parent_id: WidgetId,
+) -> Vec<WidgetId> {
+    registry.get_children(parent_id)
+        .iter()
+        .copied()
+        .filter(|&child_id| {
+            get_effective_display(registry, parent_id, child_id) != Display::None
+        })
+        .collect()
+}
 
 impl VerticalLayout {
-    /// Layout children vertically with alignment.
-    fn layout_visible(
+    pub fn layout(
         &self,
-        parent: &dyn Widget,
-        children: &[&dyn Widget],
+        registry: &WidgetRegistry,
+        parent_id: WidgetId,
         area: Rect,
-    ) -> Vec<Rect> {
+    ) -> HashMap<WidgetId, Rect> {
+        let visible_children = get_visible_children(registry, parent_id);
+        self.layout_children(registry, parent_id, &visible_children, area)
+    }
+}
+```
+
+#### 3.2 Constraint Resolution with Fraction Support
+
+The layout algorithm must properly handle all constraint types including Fraction. **Critical**: Fraction sizing requires a two-pass algorithm:
+
+1. **Pass 1**: Calculate fixed sizes (Length, Percentage, Auto)
+2. **Pass 2**: Distribute remaining space among Fraction constraints
+
+```rust
+/// Resolve constraints for a list of children on the main axis.
+/// Returns sizes for each child.
+fn resolve_main_axis_sizes(
+    registry: &WidgetRegistry,
+    children: &[WidgetId],
+    available: u16,
+    is_horizontal: bool,
+) -> Vec<u16> {
+    let mut sizes = vec![0u16; children.len()];
+    let mut remaining = available;
+    let mut total_fr = 0.0f32;
+
+    // Pass 1: Resolve fixed constraints and tally fractions
+    for (i, &child_id) in children.iter().enumerate() {
+        let Some(child) = registry.get(child_id) else { continue };
+        let hints = child.layout();
+        let constraint = if is_horizontal { hints.width } else { hints.height };
+
+        match constraint {
+            Constraint::Length(n) => {
+                let size = n.min(remaining);
+                sizes[i] = size;
+                remaining = remaining.saturating_sub(size);
+            }
+            Constraint::Percentage(p) => {
+                let size = ((available as f32 * p / 100.0) as u16).min(remaining);
+                sizes[i] = size;
+                remaining = remaining.saturating_sub(size);
+            }
+            Constraint::Auto => {
+                let content = if is_horizontal {
+                    child.get_content_width()
+                } else {
+                    child.get_content_height()
+                };
+                let size = content.min(remaining);
+                sizes[i] = size;
+                remaining = remaining.saturating_sub(size);
+            }
+            Constraint::Fraction(fr) => {
+                total_fr += fr;
+                // Will be resolved in pass 2
+            }
+        }
+    }
+
+    // Pass 2: Distribute remaining space among fractions
+    if total_fr > 0.0 && remaining > 0 {
+        let per_fr = remaining as f32 / total_fr;
+
+        for (i, &child_id) in children.iter().enumerate() {
+            let Some(child) = registry.get(child_id) else { continue };
+            let hints = child.layout();
+            let constraint = if is_horizontal { hints.width } else { hints.height };
+
+            if let Constraint::Fraction(fr) = constraint {
+                sizes[i] = (fr * per_fr).round() as u16;
+            }
+        }
+    }
+
+    sizes
+}
+```
+
+#### 3.3 Alignment with Proper Fraction Handling
+
+Alignment must work after fractions are resolved. The layout calculates the total used size (which may be less than available if no fractions), then applies alignment:
+
+```rust
+impl VerticalLayout {
+    fn layout_children(
+        &self,
+        registry: &WidgetRegistry,
+        parent_id: WidgetId,
+        children: &[WidgetId],
+        area: Rect,
+    ) -> HashMap<WidgetId, Rect> {
+        let parent = registry.get(parent_id).unwrap();
         let parent_hints = parent.layout();
 
-        // Step 1: Calculate content sizes for Auto constraints
-        let child_heights: Vec<u16> = children.iter().map(|c| {
-            let hints = c.layout();
-            match hints.height {
-                Constraint::Auto => c.get_content_height(),
-                Constraint::Length(n) => n,
-                Constraint::Percentage(p) => (area.height as f32 * p / 100.0) as u16,
-                Constraint::Fraction(_) => 0,  // Calculated below
-            }
-        }).collect();
+        // Resolve heights (main axis)
+        let heights = resolve_main_axis_sizes(registry, children, area.height, false);
+        let total_height: u16 = heights.iter().sum();
 
-        // Step 2: Calculate total content height for the group
-        let total_content_height: u16 = child_heights.iter().sum();
-
-        // Step 3: Apply VERTICAL alignment to the GROUP (main axis)
-        // This offsets where the group starts within the parent
+        // Apply VERTICAL alignment to the GROUP (main axis)
+        // Only applies if total_height < area.height (no fractions filled it)
         let group_start_y = area.y + match parent_hints.alignment.vertical {
             AlignV::Top => 0,
-            AlignV::Middle => area.height.saturating_sub(total_content_height) / 2,
-            AlignV::Bottom => area.height.saturating_sub(total_content_height),
+            AlignV::Middle => (area.height.saturating_sub(total_height) / 2) as i16,
+            AlignV::Bottom => (area.height.saturating_sub(total_height)) as i16,
         };
 
-        // Step 4: Position children relative to group start
+        let mut results = HashMap::new();
         let mut current_y = group_start_y;
-        let mut results = Vec::with_capacity(children.len());
 
-        for (i, child) in children.iter().enumerate() {
+        for (i, &child_id) in children.iter().enumerate() {
+            let child = registry.get(child_id).unwrap();
             let child_hints = child.layout();
-            let child_height = child_heights[i];
+            let child_height = heights[i];
 
-            // Calculate child width
+            // Resolve width (cross axis)
             let child_width = match child_hints.width {
-                Constraint::Auto => child.get_content_width(),
                 Constraint::Length(n) => n.min(area.width),
-                Constraint::Percentage(p) => (area.width as f32 * p / 100.0) as u16,
-                Constraint::Fraction(_) => area.width,  // Fill available
+                Constraint::Percentage(p) => ((area.width as f32 * p / 100.0) as u16).min(area.width),
+                Constraint::Auto => child.get_content_width().min(area.width),
+                Constraint::Fraction(_) => area.width,  // Fractions fill cross axis
             };
 
-            // Step 5: Apply HORIZONTAL alignment to EACH CHILD (cross axis)
+            // Apply HORIZONTAL alignment to EACH CHILD (cross axis)
             let child_x = area.x + match parent_hints.alignment.horizontal {
                 AlignH::Left => 0,
-                AlignH::Center => area.width.saturating_sub(child_width) / 2,
-                AlignH::Right => area.width.saturating_sub(child_width),
+                AlignH::Center => (area.width.saturating_sub(child_width) / 2) as i16,
+                AlignH::Right => (area.width.saturating_sub(child_width)) as i16,
             };
 
-            results.push(Rect::new(child_x, current_y, child_width, child_height));
-            current_y += child_height;
+            results.insert(child_id, Rect::new(child_x, current_y, child_width, child_height));
+            current_y += child_height as i16;
         }
 
         results
@@ -381,61 +375,52 @@ impl VerticalLayout {
 }
 
 impl HorizontalLayout {
-    /// Layout children horizontally with alignment.
-    fn layout_visible(
+    fn layout_children(
         &self,
-        parent: &dyn Widget,
-        children: &[&dyn Widget],
+        registry: &WidgetRegistry,
+        parent_id: WidgetId,
+        children: &[WidgetId],
         area: Rect,
-    ) -> Vec<Rect> {
+    ) -> HashMap<WidgetId, Rect> {
+        let parent = registry.get(parent_id).unwrap();
         let parent_hints = parent.layout();
 
-        // Step 1: Calculate content sizes for Auto constraints
-        let child_widths: Vec<u16> = children.iter().map(|c| {
-            let hints = c.layout();
-            match hints.width {
-                Constraint::Auto => c.get_content_width(),
-                Constraint::Length(n) => n,
-                Constraint::Percentage(p) => (area.width as f32 * p / 100.0) as u16,
-                Constraint::Fraction(_) => 0,  // Calculated below
-            }
-        }).collect();
+        // Resolve widths (main axis)
+        let widths = resolve_main_axis_sizes(registry, children, area.width, true);
+        let total_width: u16 = widths.iter().sum();
 
-        // Step 2: Calculate total content width for the group
-        let total_content_width: u16 = child_widths.iter().sum();
-
-        // Step 3: Apply HORIZONTAL alignment to the GROUP (main axis)
+        // Apply HORIZONTAL alignment to the GROUP (main axis)
         let group_start_x = area.x + match parent_hints.alignment.horizontal {
             AlignH::Left => 0,
-            AlignH::Center => area.width.saturating_sub(total_content_width) / 2,
-            AlignH::Right => area.width.saturating_sub(total_content_width),
+            AlignH::Center => (area.width.saturating_sub(total_width) / 2) as i16,
+            AlignH::Right => (area.width.saturating_sub(total_width)) as i16,
         };
 
-        // Step 4: Position children relative to group start
+        let mut results = HashMap::new();
         let mut current_x = group_start_x;
-        let mut results = Vec::with_capacity(children.len());
 
-        for (i, child) in children.iter().enumerate() {
+        for (i, &child_id) in children.iter().enumerate() {
+            let child = registry.get(child_id).unwrap();
             let child_hints = child.layout();
-            let child_width = child_widths[i];
+            let child_width = widths[i];
 
-            // Calculate child height
+            // Resolve height (cross axis)
             let child_height = match child_hints.height {
-                Constraint::Auto => child.get_content_height(),
                 Constraint::Length(n) => n.min(area.height),
-                Constraint::Percentage(p) => (area.height as f32 * p / 100.0) as u16,
-                Constraint::Fraction(_) => area.height,  // Fill available
+                Constraint::Percentage(p) => ((area.height as f32 * p / 100.0) as u16).min(area.height),
+                Constraint::Auto => child.get_content_height().min(area.height),
+                Constraint::Fraction(_) => area.height,  // Fractions fill cross axis
             };
 
-            // Step 5: Apply VERTICAL alignment to EACH CHILD (cross axis)
+            // Apply VERTICAL alignment to EACH CHILD (cross axis)
             let child_y = area.y + match parent_hints.alignment.vertical {
                 AlignV::Top => 0,
-                AlignV::Middle => area.height.saturating_sub(child_height) / 2,
-                AlignV::Bottom => area.height.saturating_sub(child_height),
+                AlignV::Middle => (area.height.saturating_sub(child_height) / 2) as i16,
+                AlignV::Bottom => (area.height.saturating_sub(child_height)) as i16,
             };
 
-            results.push(Rect::new(current_x, child_y, child_width, child_height));
-            current_x += child_width;
+            results.insert(child_id, Rect::new(current_x, child_y, child_width, child_height));
+            current_x += child_width as i16;
         }
 
         results
@@ -1119,28 +1104,12 @@ impl Tabs {
         }
     }
 
-    /// Compose the Tabs widget tree.
-    /// Returns: Vertical container with [Horizontal(tabs...), Underline]
-    pub fn compose(&self) -> impl Widget {
-        let tabs_row = Horizontal::new()
-            .with_id("tabs-list");
-
-        // Tabs are added dynamically via add_tab()
-        // The compose pattern in Rust returns a static structure,
-        // children are managed separately
-
-        Vertical::new()
-            .with_id("tabs-bar")
-            .with_children(vec![
-                Box::new(tabs_row) as Box<dyn Widget>,
-                Box::new(self.underline.clone()) as Box<dyn Widget>,
-            ])
-    }
-
-    /// Get children for rendering.
-    fn children(&self) -> Vec<&dyn Widget> {
-        self.tabs.iter().map(|t| t as &dyn Widget).collect()
-    }
+    // Note: Tabs internally manages Tab widgets and renders them directly.
+    // It does NOT use the Compose trait because tabs are dynamically added/removed
+    // and stored within the Tabs struct itself.
+    //
+    // The layout system treats Tabs as a leaf widget that renders its own
+    // internal structure (tabs row + underline) in its render() method.
 
     /// Add a tab.
     pub fn add_tab(&mut self, tab: Tab) {
@@ -1643,42 +1612,31 @@ impl Widget for TabbedContent {
         Some(LayoutType::Vertical)
     }
 
-    /// Compose the TabbedContent widget tree.
-    /// Structure: Vertical container with [Tabs (docked top), ContentSwitcher]
-    fn compose(&self) -> impl Widget {
-        // ContentTabs is a specialized Tabs docked to top
-        let content_tabs = self.tabs.clone()
-            .with_dock(Dock::Top);
-
-        Vertical::new()
-            .with_children(vec![
-                Box::new(content_tabs) as Box<dyn Widget>,
-                Box::new(self.switcher.clone()) as Box<dyn Widget>,
-            ])
-    }
-
-    fn render(&self, area: Rect, frame: &mut Frame) {
-        // Calculate tabs height (2 rows: tabs + underline)
-        let tabs_height = 2;
-        let tabs_area = Rect::new(area.x, area.y, area.width, tabs_height);
-        let content_area = Rect::new(
-            area.x,
-            area.y + tabs_height,
-            area.width,
-            area.height.saturating_sub(tabs_height),
-        );
-
-        // Render Tabs (docked at top)
-        self.tabs.render(tabs_area, frame);
-
-        // Render ContentSwitcher (shows active pane)
-        self.switcher.render(content_area, frame);
-    }
-
     fn widget_type_name(&self) -> &'static str {
         "TabbedContent"
     }
 }
+
+/// TabbedContent uses the Compose trait to build its child tree.
+/// Structure: Tabs (docked top) + ContentSwitcher
+impl Compose for TabbedContent {
+    fn compose(&self, ctx: &mut ComposeContext) {
+        // Add Tabs widget (with dock hint for top positioning)
+        let tabs = self.tabs.clone();
+        ctx.add(tabs);
+
+        // Add ContentSwitcher that manages pane visibility
+        // TabPanes are added as children of the switcher
+        ctx.add(self.switcher.clone());
+    }
+}
+
+// Note: TabbedContent uses layout_type() = Vertical to stack children.
+// The Tabs widget renders at its natural height (2 rows).
+// ContentSwitcher fills remaining space and shows only the active pane.
+//
+// Rendering is handled by the framework's layout/render pass, not manually.
+// Each child widget's render() is called with its computed area.
 
 // Message handling for tab activation
 impl TabbedContent {
@@ -1924,6 +1882,10 @@ impl Collapsible {
 }
 
 impl Widget for Collapsible {
+    fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
     fn layout(&self) -> LayoutHints {
         LayoutHints::default()
             .with_width(Constraint::Fraction(1.0))
@@ -1932,35 +1894,6 @@ impl Widget for Collapsible {
 
     fn layout_type(&self) -> Option<LayoutType> {
         Some(LayoutType::Vertical)
-    }
-
-    /// Compose the Collapsible widget tree.
-    /// Structure: Vertical container with [CollapsibleTitle, Contents]
-    fn compose(&self) -> impl Widget {
-        Vertical::new()
-            .with_children(vec![
-                Box::new(self.title.clone()) as Box<dyn Widget>,
-                Box::new(self.contents.clone()) as Box<dyn Widget>,
-            ])
-    }
-
-    fn render(&self, area: Rect, frame: &mut Frame) {
-        // Render title (always visible)
-        let title_height = self.title.get_content_height();
-        let title_area = Rect::new(area.x, area.y, area.width, title_height);
-        self.title.render(title_area, frame);
-
-        // Render contents only if not collapsed (display != None)
-        if !self.collapsed {
-            let contents_area = Rect::new(
-                area.x,
-                area.y + title_height,
-                area.width,
-                area.height.saturating_sub(title_height),
-            );
-            self.contents.render(contents_area, frame);
-        }
-        // When collapsed, contents has display: none, so layout skips it
     }
 
     fn get_content_height(&self) -> u16 {
@@ -1977,6 +1910,24 @@ impl Widget for Collapsible {
     }
 }
 
+/// Collapsible uses the Compose trait to build its child tree.
+/// Structure: CollapsibleTitle + Contents (vertical layout)
+impl Compose for Collapsible {
+    fn compose(&self, ctx: &mut ComposeContext) {
+        // Add title widget (always visible, focusable)
+        ctx.add(self.title.clone());
+
+        // Add contents widget (has display: none when collapsed)
+        // The Contents widget handles its own display state via layout()
+        ctx.add(self.contents.clone());
+    }
+}
+
+// Note: Collapsible uses layout_type() = Vertical to stack children.
+// CollapsibleTitle renders the arrow and title text.
+// Contents returns display: none in layout() when collapsed,
+// so the layout system automatically skips it.
+
 // Message flow for toggle action
 impl Collapsible {
     /// Handle toggle action from CollapsibleTitle.
@@ -1987,21 +1938,23 @@ impl Collapsible {
 }
 ```
 
-### 9. Widget Trait Extension
+### 9. Widget Trait Extension Summary
 
-Add `grid_config()` method to Widget trait for ItemGrid support:
+All Widget trait extensions are defined in **Section 2.1**. This section summarizes the new APIs:
 
-```rust
-// In widget.rs:
-pub trait Widget {
-    // ... existing methods ...
+| Method | Return Type | Purpose |
+|--------|-------------|---------|
+| `id()` | `Option<&str>` | Widget ID for lookups and ContentSwitcher coordination |
+| `get_content_width()` | `u16` | Content width for `Constraint::Auto` sizing |
+| `get_content_height()` | `u16` | Content height for `Constraint::Auto` sizing |
+| `grid_config()` | `Option<&GridConfig>` | Grid configuration for ItemGrid |
 
-    /// Return grid configuration if this widget uses grid layout.
-    fn grid_config(&self) -> Option<&GridConfig> {
-        None
-    }
-}
-```
+All methods have default implementations returning `None` or `0`, making them opt-in.
+
+**Implementation Requirements**:
+- Widgets with IDs must implement `id()` (ContentSwitcher, TabbedContent panes)
+- Widgets using `Constraint::Auto` should implement `get_content_*()` methods
+- ItemGrid must implement `grid_config()` to return its computed configuration
 
 ### 10. File Organization
 
@@ -2048,11 +2001,18 @@ CollapsibleTitle, Contents (new)
 
 1. **Core Extensions** (Required First)
    - Add `Display` enum to geometry.rs
-   - Add `Alignment` struct to geometry.rs
-   - Extend `LayoutHints` with display and alignment
-   - Add `grid_config()` to Widget trait
-   - Update layout algorithms to filter `display: none` widgets
-   - Update layout algorithms to apply alignment
+   - Add `Alignment` struct (AlignH, AlignV) to geometry.rs
+   - Extend `LayoutHints` with display and alignment fields
+   - Add Widget trait methods (see Section 2.1):
+     - `id()` → `Option<&str>`
+     - `get_content_width()` → `u16`
+     - `get_content_height()` → `u16`
+     - `grid_config()` → `Option<&GridConfig>`
+   - Add `ChildDisplayOverride` trait to layout.rs
+   - Update layout algorithms:
+     - Filter `display: none` widgets via `get_effective_display()`
+     - Two-pass constraint resolution for Fraction support
+     - Apply alignment after fraction resolution
 
 2. **Alignment Containers** (Simple)
    - Center, Middle, Right, CenterMiddle
