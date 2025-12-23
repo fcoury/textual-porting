@@ -194,8 +194,8 @@
 - [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [25a0187]
 
 ## Phase 4: Testing & Verification
-- [ ] Task: Create API compatibility tests
-- [ ] Task: Create example app with all widgets
-- [ ] Task: Test keyboard navigation
-- [ ] Task: Run all tests and fix failures
+- [x] Task: Create API compatibility tests (89 tests) [b8d2b3b]
+- [x] Task: Create example app with all widgets [997ed49]
+- [x] Task: Test keyboard navigation (widget_gallery example with Tab, Enter, arrow keys)
+- [x] Task: Run all tests and fix failures (1744 tests pass)
 - [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
