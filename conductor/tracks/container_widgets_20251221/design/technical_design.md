@@ -415,12 +415,24 @@ impl VerticalLayout {
             let child_hints = child.layout();
             let child_height = heights[i];
 
-            // Resolve width (cross axis)
+            // Resolve width (cross axis) with min/max clamping
             let child_width = match child_hints.width {
-                Constraint::Length(n) => n.min(area.width),
-                Constraint::Percentage(p) => ((area.width as f32 * p / 100.0) as u16).min(area.width),
-                Constraint::Auto => child.get_content_width().min(area.width),
-                Constraint::Fraction(_) => area.width,  // Fractions fill cross axis
+                Constraint::Length(n) => {
+                    let raw = n.min(area.width);
+                    clamp_to_minmax(raw, &child_hints, true)
+                }
+                Constraint::Percentage(p) => {
+                    let raw = ((area.width as f32 * p / 100.0) as u16).min(area.width);
+                    clamp_to_minmax(raw, &child_hints, true)
+                }
+                Constraint::Auto => {
+                    let raw = child.get_content_width().min(area.width);
+                    clamp_to_minmax(raw, &child_hints, true)
+                }
+                Constraint::Fraction(_) => {
+                    // Fractions fill cross axis, but still respect min/max
+                    clamp_to_minmax(area.width, &child_hints, true)
+                }
             };
 
             // Apply HORIZONTAL alignment to EACH CHILD (cross axis)
@@ -468,12 +480,24 @@ impl HorizontalLayout {
             let child_hints = child.layout();
             let child_width = widths[i];
 
-            // Resolve height (cross axis)
+            // Resolve height (cross axis) with min/max clamping
             let child_height = match child_hints.height {
-                Constraint::Length(n) => n.min(area.height),
-                Constraint::Percentage(p) => ((area.height as f32 * p / 100.0) as u16).min(area.height),
-                Constraint::Auto => child.get_content_height().min(area.height),
-                Constraint::Fraction(_) => area.height,  // Fractions fill cross axis
+                Constraint::Length(n) => {
+                    let raw = n.min(area.height);
+                    clamp_to_minmax(raw, &child_hints, false)
+                }
+                Constraint::Percentage(p) => {
+                    let raw = ((area.height as f32 * p / 100.0) as u16).min(area.height);
+                    clamp_to_minmax(raw, &child_hints, false)
+                }
+                Constraint::Auto => {
+                    let raw = child.get_content_height().min(area.height);
+                    clamp_to_minmax(raw, &child_hints, false)
+                }
+                Constraint::Fraction(_) => {
+                    // Fractions fill cross axis, but still respect min/max
+                    clamp_to_minmax(area.height, &child_hints, false)
+                }
             };
 
             // Apply VERTICAL alignment to EACH CHILD (cross axis)
@@ -1597,34 +1621,30 @@ impl Widget for TabPane {
 
 #### 7.6 TabbedContent Widget
 
-**IMPORTANT**: Composite widgets store **logical state only**, not child widget instances.
-Children are created in compose() and added to the registry. The parent accesses
-children via registry when needed. This avoids the clone-divergence problem.
+**IMPORTANT**: TabbedContent stores actual TabPane widgets (not just configs) so that
+compose() can correctly place them as children of ContentSwitcher. Widgets should
+implement Clone to support this pattern.
 
 ```rust
 /// Prefix for content tab IDs.
 const CONTENT_TAB_PREFIX: &str = "--content-tab-";
 
-/// Configuration for a pane (stored in TabbedContent, not the widget itself).
-#[derive(Clone)]
-struct PaneConfig {
-    id: String,
-    title: String,
-    disabled: bool,
-    hidden: bool,
-}
-
 /// Container with tabs and switchable content panes.
-/// Stores logical state; children are created in compose().
+/// Stores TabPane widgets; compose() places them under ContentSwitcher.
 pub struct TabbedContent {
     id: Option<String>,
-    /// Pane configurations (NOT TabPane widgets).
-    panes: Vec<PaneConfig>,
-    /// Currently active pane ID (not tab ID).
+    /// Stored TabPane widgets (cloned into registry during compose).
+    panes: Vec<TabPane>,
+    /// Currently active pane ID.
     active_id: Option<String>,
-    /// Child widget IDs (set after compose runs).
-    tabs_id: Option<WidgetId>,
-    switcher_id: Option<WidgetId>,
+    /// Tab disabled/hidden state (separate from TabPane).
+    tab_states: HashMap<String, TabState>,
+}
+
+#[derive(Default)]
+struct TabState {
+    disabled: bool,
+    hidden: bool,
 }
 
 impl TabbedContent {
@@ -1633,13 +1653,24 @@ impl TabbedContent {
             id: None,
             panes: Vec::new(),
             active_id: None,
-            tabs_id: None,
-            switcher_id: None,
+            tab_states: HashMap::new(),
         }
     }
 
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
+        self
+    }
+
+    /// Add a TabPane widget. The pane is stored and placed under ContentSwitcher
+    /// during compose(). Pane must have an ID set.
+    pub fn with_pane(mut self, pane: TabPane) -> Self {
+        let pane_id = pane.id().expect("TabPane must have ID").to_string();
+        if self.active_id.is_none() {
+            self.active_id = Some(pane_id.clone());
+        }
+        self.tab_states.entry(pane_id).or_default();
+        self.panes.push(pane);
         self
     }
 
@@ -1649,7 +1680,6 @@ impl TabbedContent {
     }
 
     /// Set active pane by pane ID.
-    /// Returns message to propagate. Call request_recompose() after.
     pub fn set_active(&mut self, pane_id: impl Into<String>) -> Option<TabActivated> {
         let pane_id = pane_id.into();
         let previous = self.active_id.take();
@@ -1660,59 +1690,31 @@ impl TabbedContent {
         })
     }
 
-    /// Add a pane configuration.
-    pub fn add_pane(&mut self, id: impl Into<String>, title: impl Into<String>) {
-        self.panes.push(PaneConfig {
-            id: id.into(),
-            title: title.into(),
-            disabled: false,
-            hidden: false,
-        });
-        // First pane becomes active by default
-        if self.active_id.is_none() {
-            self.active_id = Some(self.panes.last().unwrap().id.clone());
-        }
-    }
-
-    /// Remove a pane by ID.
-    pub fn remove_pane(&mut self, pane_id: &str) {
-        self.panes.retain(|p| p.id != pane_id);
-        if self.active_id.as_deref() == Some(pane_id) {
-            self.active_id = self.panes.first().map(|p| p.id.clone());
-        }
-    }
-
-    /// Clear all panes.
-    pub fn clear_panes(&mut self) {
-        self.panes.clear();
-        self.active_id = None;
-    }
-
     /// Disable a tab by pane ID.
     pub fn disable_tab(&mut self, pane_id: &str) {
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
-            pane.disabled = true;
+        if let Some(state) = self.tab_states.get_mut(pane_id) {
+            state.disabled = true;
         }
     }
 
     /// Enable a tab by pane ID.
     pub fn enable_tab(&mut self, pane_id: &str) {
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
-            pane.disabled = false;
+        if let Some(state) = self.tab_states.get_mut(pane_id) {
+            state.disabled = false;
         }
     }
 
     /// Hide a tab by pane ID.
     pub fn hide_tab(&mut self, pane_id: &str) {
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
-            pane.hidden = true;
+        if let Some(state) = self.tab_states.get_mut(pane_id) {
+            state.hidden = true;
         }
     }
 
     /// Show a tab by pane ID.
     pub fn show_tab(&mut self, pane_id: &str) {
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id == pane_id) {
-            pane.hidden = false;
+        if let Some(state) = self.tab_states.get_mut(pane_id) {
+            state.hidden = false;
         }
     }
 }
@@ -1736,20 +1738,24 @@ impl Widget for TabbedContent {
     }
 }
 
-/// TabbedContent creates children from logical state in compose().
-/// Children are added to registry; this avoids clone-divergence.
+/// TabbedContent compose() places TabPanes as children of ContentSwitcher.
+/// This ensures ContentSwitcher controls their visibility correctly.
 impl Compose for TabbedContent {
     fn compose(&self, ctx: &mut ComposeContext) {
-        // Build Tabs widget from pane configs
+        // Build Tabs widget from stored TabPanes
         let mut tabs = Tabs::new();
         for pane in &self.panes {
-            let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane.id);
-            let mut tab = Tab::new(&tab_id, &pane.title);
-            if pane.disabled {
-                tab = tab.with_disabled(true);
-            }
-            if pane.hidden {
-                tab.set_hidden(true);
+            let pane_id = pane.id().unwrap();
+            let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+            let mut tab = Tab::new(&tab_id, pane.title());
+
+            if let Some(state) = self.tab_states.get(pane_id) {
+                if state.disabled {
+                    tab = tab.with_disabled(true);
+                }
+                if state.hidden {
+                    tab.set_hidden(true);
+                }
             }
             tabs.add_tab(tab);
         }
@@ -1759,24 +1765,31 @@ impl Compose for TabbedContent {
         }
         ctx.add(tabs);
 
-        // Build ContentSwitcher with active pane
+        // Build ContentSwitcher and add TabPanes as its children
         let mut switcher = ContentSwitcher::new();
         switcher.set_current(self.active_id.clone());
-        ctx.add(switcher);
 
-        // Note: TabPane widgets are added to switcher externally via add_with()
-        // See usage pattern below.
+        // CRITICAL: Use add_with to make panes children of switcher, not siblings
+        ctx.add_with(switcher, |ctx| {
+            for pane in &self.panes {
+                // Clone pane into registry under ContentSwitcher
+                ctx.add(pane.clone());
+            }
+        });
     }
 }
 
-// Usage pattern for adding panes with content:
+// Usage pattern:
 //
-// ctx.add_with(TabbedContent::new(), |ctx| {
-//     ctx.add(TabPane::new("tab1", "First Tab").with_children(...));
-//     ctx.add(TabPane::new("tab2", "Second Tab").with_children(...));
-// });
+// ctx.add(
+//     TabbedContent::new()
+//         .with_pane(TabPane::new("tab1", "First Tab")
+//             .with_content(Label::new("Content 1")))
+//         .with_pane(TabPane::new("tab2", "Second Tab")
+//             .with_content(Button::new("Click me")))
+// );
 //
-// TabbedContent.add_pane() stores config; actual TabPane widgets are external.
+// TabPanes are stored in TabbedContent and cloned into ContentSwitcher during compose.
 
 // Message handling for tab activation
 impl TabbedContent {
@@ -1933,13 +1946,29 @@ impl Widget for Contents {
 }
 
 /// Collapsible container with toggle header.
-/// Stores logical state only; children are created in compose().
+/// Stores content widgets; compose() places them under Contents.
+/// Widgets should implement Clone to support this pattern.
 pub struct Collapsible {
     id: Option<String>,
-    /// Title text (NOT CollapsibleTitle widget).
+    /// Title text.
     title_text: String,
     /// Collapsed state (default: true).
     collapsed: bool,
+    /// Content widgets stored until compose (require Clone).
+    content: Vec<Box<dyn CloneableWidget>>,
+}
+
+/// Trait for widgets that can be cloned (required for composite widgets).
+/// Widgets stored in TabbedContent/Collapsible must implement this.
+pub trait CloneableWidget: Widget {
+    fn clone_box(&self) -> Box<dyn CloneableWidget>;
+}
+
+// Blanket implementation for Clone + Widget types
+impl<T: Widget + Clone + 'static> CloneableWidget for T {
+    fn clone_box(&self) -> Box<dyn CloneableWidget> {
+        Box::new(self.clone())
+    }
 }
 
 /// Collapsible toggled message.
@@ -1954,6 +1983,7 @@ impl Collapsible {
             id: None,
             title_text: title.into(),
             collapsed: true,  // Default collapsed per Python Textual
+            content: Vec::new(),
         }
     }
 
@@ -1965,6 +1995,13 @@ impl Collapsible {
     /// Set initial collapsed state (default: true).
     pub fn with_collapsed(mut self, collapsed: bool) -> Self {
         self.collapsed = collapsed;
+        self
+    }
+
+    /// Add a content widget. Content is stored and placed under Contents
+    /// during compose(). Widget must implement Clone.
+    pub fn with_content<W: Widget + Clone + 'static>(mut self, widget: W) -> Self {
+        self.content.push(Box::new(widget));
         self
     }
 
@@ -2032,30 +2069,38 @@ impl Widget for Collapsible {
     }
 }
 
-/// Collapsible creates children from logical state in compose().
-/// Children are added to registry; this avoids clone-divergence.
+/// Collapsible compose() places content widgets as children of Contents.
+/// This ensures Contents display toggling affects them correctly.
 impl Compose for Collapsible {
     fn compose(&self, ctx: &mut ComposeContext) {
-        // Create title widget from state
+        // Create title widget
         let mut title = CollapsibleTitle::new(&self.title_text);
         title.set_collapsed(self.collapsed);
         ctx.add(title);
 
-        // Create contents widget with proper display state
+        // Create contents widget and add content as its children
         let mut contents = Contents::new();
         contents.set_visible(!self.collapsed);
-        ctx.add(contents);
 
-        // Note: Actual content widgets are added to Contents externally via add_with()
+        // CRITICAL: Use add_with to make content children of Contents, not siblings
+        ctx.add_with(contents, |ctx| {
+            for widget in &self.content {
+                // Clone content widget into registry under Contents
+                ctx.add_boxed(widget.clone_box());
+            }
+        });
     }
 }
 
 // Usage pattern:
 //
-// ctx.add_with(Collapsible::new("Section Title"), |ctx| {
-//     ctx.add(Label::new("Content inside the collapsible"));
-//     ctx.add(Button::new("Click me"));
-// });
+// ctx.add(
+//     Collapsible::new("Section Title")
+//         .with_content(Label::new("Content inside the collapsible"))
+//         .with_content(Button::new("Click me"))
+// );
+//
+// Content widgets are stored in Collapsible and cloned into Contents during compose.
 
 // Message flow for toggle action
 impl Collapsible {
@@ -2141,7 +2186,7 @@ CollapsibleTitle, Contents (new)
      - `get_content_height()` → `u16`
      - `grid_config()` → `Option<&GridConfig>`
      - `as_display_override()` → `Option<&dyn ChildDisplayOverride>`
-   - Add `ChildDisplayOverride` trait to layout.rs
+   - Add `ChildDisplayOverride` trait to widget.rs (see Section 2.2)
    - Update layout algorithms:
      - Filter `display: none` widgets via `get_effective_display()`
      - Two-pass constraint resolution for Fraction support
