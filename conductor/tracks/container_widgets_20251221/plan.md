@@ -19,33 +19,33 @@
 
 ## Phase 3: Implementation
 
-### 3.1 Container Base
-- [ ] Task: Implement Container struct
-- [ ] Task: Implement compose() support for children
-- [ ] Task: Implement default vertical layout
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Container
+### 3.1 Container Base (Pre-existing from prior tracks)
+- [x] Task: Implement Container struct [2cdcb9a]
+- [x] Task: Implement compose() support for children [2cdcb9a]
+- [x] Task: Implement default vertical layout [e59dc6f]
+- [x] Task: Add DEFAULT_CSS [2cdcb9a]
+- [x] Task: Write tests for Container [2cdcb9a]
 
-### 3.2 Vertical Container
-- [ ] Task: Implement Vertical extending Container
-- [ ] Task: Apply VerticalLayout
-- [ ] Task: Support gap/spacing property
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Vertical
+### 3.2 Vertical Container (Pre-existing from prior tracks)
+- [x] Task: Implement Vertical extending Container [e59dc6f]
+- [x] Task: Apply VerticalLayout [e59dc6f]
+- [x] Task: Support gap/spacing property [76f5a5a]
+- [x] Task: Add DEFAULT_CSS [e59dc6f]
+- [x] Task: Write tests for Vertical [e59dc6f]
 
-### 3.3 Horizontal Container
-- [ ] Task: Implement Horizontal extending Container
-- [ ] Task: Apply HorizontalLayout
-- [ ] Task: Support gap/spacing property
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Horizontal
+### 3.3 Horizontal Container (Pre-existing from prior tracks)
+- [x] Task: Implement Horizontal extending Container [e59dc6f]
+- [x] Task: Apply HorizontalLayout [e59dc6f]
+- [x] Task: Support gap/spacing property [76f5a5a]
+- [x] Task: Add DEFAULT_CSS [e59dc6f]
+- [x] Task: Write tests for Horizontal [e59dc6f]
 
-### 3.4 Grid Container
-- [ ] Task: Implement Grid extending Container
-- [ ] Task: Apply GridLayout
-- [ ] Task: Support grid-template-* properties
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Grid
+### 3.4 Grid Container (Pre-existing from prior tracks)
+- [x] Task: Implement Grid extending Container [76f5a5a]
+- [x] Task: Apply GridLayout [76f5a5a]
+- [x] Task: Support grid-template-* properties [76f5a5a]
+- [x] Task: Add DEFAULT_CSS [76f5a5a]
+- [x] Task: Write tests for Grid [76f5a5a]
 
 ### 3.5 Center Container
 - [ ] Task: Implement Center extending Container
