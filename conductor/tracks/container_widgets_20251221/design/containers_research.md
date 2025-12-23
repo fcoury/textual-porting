@@ -243,8 +243,9 @@ All support: ID, CSS classes, borders, width/height constraints, dock positionin
 
 4. **Right** - Right alignment container
 
-5. **VerticalGroup / HorizontalGroup** - Collapsing variants
-   - Use `width: auto; height: auto` instead of `1fr`
+5. **VerticalGroup / HorizontalGroup** - Non-expanding variants
+   - Use `height: auto` instead of `height: 1fr` (shrink to content height)
+   - Add `overflow: hidden hidden` (no scrolling)
 
 6. **ItemGrid** - Advanced grid with reactive properties
    - `min_column_width`, `max_column_width`
