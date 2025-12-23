@@ -2,7 +2,7 @@
 
 ## Phase 1: Analysis & Research
 - [x] Task: Study Python Textual containers.py implementation [b8379a3]
-- [~] Task: Analyze ScrollableContainer and scroll methods
+- [x] Task: Analyze ScrollableContainer and scroll methods [9ccbbdb]
 - [ ] Task: Document _tabbed_content.py and _tabs.py in detail
 - [ ] Task: Study _collapsible.py animation and state management
 - [ ] Task: Analyze _content_switcher.py patterns
