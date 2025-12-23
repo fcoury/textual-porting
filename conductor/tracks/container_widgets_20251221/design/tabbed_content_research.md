@@ -96,6 +96,50 @@ Tabs {
 }
 ```
 
+## Underline Class (Internal Widget)
+
+The Underline widget is an internal component used by Tabs to render an animated indicator bar beneath the active tab.
+
+### Reactive Properties
+| Property | Type | Description |
+|----------|------|-------------|
+| `highlight_start` | int | Starting cell position for the highlight |
+| `highlight_end` | int | Ending cell position (inclusive) for the highlight |
+| `show_highlight` | bool | Controls visibility of the highlight bar |
+
+### Messages
+| Message | Trigger |
+|---------|---------|
+| `Underline.Clicked` | Underline receives click event (reports offset coordinates) |
+
+### Methods
+- `render()` - Returns a `Bar` renderable with highlight range and styled appearance
+
+### Behavior
+- Calculates highlight position from active tab's virtual region dimensions
+- Renders using the `Bar` renderable for smooth visual appearance
+- Click events report relative offset coordinates for tab detection
+
+### DEFAULT_CSS
+```css
+Underline {
+    width: 1fr;
+    height: 1;
+
+    > .underline--bar {
+        color: $block-cursor-background;
+        background: $foreground 10%;
+    }
+
+    &:ansi {
+        text-style: dim;
+    }
+}
+```
+
+### Component Classes
+- `underline--bar` - Styling hook for bar color customization
+
 ## TabPane Class
 
 ### Properties
@@ -215,7 +259,13 @@ This ensures:
 6. Add TabActivated, Cleared messages
 7. Add DEFAULT_CSS
 
-### Phase 5: Underline Animation (Optional)
-- Animated indicator bar beneath active tab
-- Uses Bar renderable with highlight range
-- Calculates position from active tab's region
+### Phase 5: Underline Widget
+1. Create Underline struct with reactive properties:
+   - `highlight_start: i16`
+   - `highlight_end: i16`
+   - `show_highlight: bool`
+2. Implement render() with Bar renderable
+3. Implement Underline.Clicked message with offset coordinates
+4. Calculate highlight position from active tab's region
+5. Add DEFAULT_CSS with component class `.underline--bar`
+6. Write tests for highlight positioning
