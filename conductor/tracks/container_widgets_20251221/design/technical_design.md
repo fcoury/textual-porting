@@ -20,6 +20,16 @@
 - **BindingManager** - Key matching and dispatch
 - **ActionHandler** trait - For widgets to handle actions
 
+### Existing Constraint Enum (geometry.rs)
+```rust
+pub enum Constraint {
+    Length(u16),      // Fixed size in cells
+    Percentage(f32),  // 0.0 to 100.0
+    Fraction(f32),    // Like CSS fr unit (1fr = Fraction(1.0))
+    Auto,             // Size based on content
+}
+```
+
 ## Design Decisions
 
 ### 1. Container Base Approach
@@ -44,32 +54,97 @@ pub struct VerticalGroup {
 
 **Rationale**: This matches the existing code style and avoids complex trait hierarchies.
 
-### 2. Layout Type Extension
+### 2. Display Property for Visibility (NEW)
 
-The `Widget` trait already has `layout_type()` returning `Option<LayoutType>`:
+Add a `Display` enum to control widget visibility in layout:
 
 ```rust
-// Existing:
-fn layout_type(&self) -> Option<LayoutType> {
-    None // Default
+// In geometry.rs:
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Display {
+    /// Widget is visible and participates in layout.
+    #[default]
+    Block,
+    /// Widget is hidden and skipped in layout (takes no space).
+    None,
 }
 
-// LayoutType enum (extend if needed):
-pub enum LayoutType {
-    Vertical,
-    Horizontal,
-    Grid,
+// Extend LayoutHints:
+pub struct LayoutHints {
+    pub width: Constraint,
+    pub height: Constraint,
+    pub min_size: Option<Size>,
+    pub max_size: Option<Size>,
+    pub dock: Option<Dock>,
+    pub display: Display,       // NEW: Controls visibility
+    pub alignment: Alignment,   // NEW: Child alignment
+}
+
+impl LayoutHints {
+    /// Set display mode.
+    pub fn with_display(mut self, display: Display) -> Self {
+        self.display = display;
+        self
+    }
+
+    /// Check if widget should be included in layout.
+    pub fn is_visible(&self) -> bool {
+        self.display != Display::None
+    }
 }
 ```
 
-For alignment containers, they don't need a special layout type - they use CSS-like alignment which is handled differently.
+### 3. Layout System Integration
 
-### 3. Alignment Container Design
+#### 3.1 Layout Filtering for Display::None
 
-Alignment is handled via `LayoutHints`. Add alignment fields:
+All layout algorithms must skip widgets with `display: none`:
 
 ```rust
-// In geometry.rs or layout.rs:
+// In layout.rs - modify layout functions:
+
+impl VerticalLayout {
+    pub fn layout(&self, children: &[&dyn Widget], area: Rect) -> Vec<Rect> {
+        // Filter out hidden children
+        let visible_children: Vec<_> = children
+            .iter()
+            .filter(|c| c.layout().display != Display::None)
+            .collect();
+
+        // Layout only visible children
+        self.layout_visible(&visible_children, area)
+    }
+}
+
+impl HorizontalLayout {
+    pub fn layout(&self, children: &[&dyn Widget], area: Rect) -> Vec<Rect> {
+        let visible_children: Vec<_> = children
+            .iter()
+            .filter(|c| c.layout().display != Display::None)
+            .collect();
+
+        self.layout_visible(&visible_children, area)
+    }
+}
+
+impl GridLayout {
+    pub fn layout(&self, children: &[&dyn Widget], area: Rect) -> Vec<Rect> {
+        let visible_children: Vec<_> = children
+            .iter()
+            .filter(|c| c.layout().display != Display::None)
+            .collect();
+
+        self.layout_visible(&visible_children, area)
+    }
+}
+```
+
+#### 3.2 Alignment Handling in Layout
+
+Alignment containers set hints that layout algorithms honor when positioning children:
+
+```rust
+// In geometry.rs:
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Alignment {
     pub horizontal: AlignH,
@@ -91,13 +166,36 @@ pub enum AlignV {
     Middle,
     Bottom,
 }
+```
 
-// Extend LayoutHints:
-pub struct LayoutHints {
-    pub width: Constraint,
-    pub height: Constraint,
-    pub dock: Option<Dock>,
-    pub alignment: Alignment,  // NEW
+Layout algorithms apply parent alignment to children:
+
+```rust
+// In layout.rs:
+fn apply_alignment(
+    child_rect: Rect,
+    parent_area: Rect,
+    parent_hints: &LayoutHints,
+) -> Rect {
+    let mut result = child_rect;
+
+    // Apply horizontal alignment within remaining space
+    let h_space = parent_area.width.saturating_sub(child_rect.width);
+    result.x = parent_area.x + match parent_hints.alignment.horizontal {
+        AlignH::Left => 0,
+        AlignH::Center => h_space / 2,
+        AlignH::Right => h_space,
+    };
+
+    // Apply vertical alignment within remaining space
+    let v_space = parent_area.height.saturating_sub(child_rect.height);
+    result.y = parent_area.y + match parent_hints.alignment.vertical {
+        AlignV::Top => 0,
+        AlignV::Middle => v_space / 2,
+        AlignV::Bottom => v_space,
+    };
+
+    result
 }
 ```
 
@@ -117,25 +215,120 @@ impl Center {
     pub fn new() -> Self {
         Self {
             inner: Container::new()
-                .with_width(Constraint::Ratio(1.0))
+                .with_width(Constraint::Fraction(1.0))
                 .with_height(Constraint::Auto),
         }
     }
+
     // Builder methods delegate to inner...
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.inner = self.inner.with_id(id);
+        self
+    }
 }
 
 impl Widget for Center {
     fn layout(&self) -> LayoutHints {
-        self.inner.layout().with_align_horizontal(AlignH::Center)
+        self.inner.layout()
+            .with_alignment(Alignment {
+                horizontal: AlignH::Center,
+                vertical: AlignV::Top,
+            })
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)  // Stack children vertically, then center
     }
     // Other methods delegate to inner...
 }
-```
 
-Same pattern for:
-- **Middle** - `align_vertical: AlignV::Middle`, `width: auto`, `height: 1fr`
-- **CenterMiddle** - Both alignments, `width: 1fr`, `height: 1fr`
-- **Right** - `align_horizontal: AlignH::Right`, `width: 1fr`, `height: auto`
+/// Vertically centers children.
+pub struct Middle {
+    inner: Container,
+}
+
+impl Middle {
+    pub fn new() -> Self {
+        Self {
+            inner: Container::new()
+                .with_width(Constraint::Auto)
+                .with_height(Constraint::Fraction(1.0)),
+        }
+    }
+}
+
+impl Widget for Middle {
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+            .with_alignment(Alignment {
+                horizontal: AlignH::Left,
+                vertical: AlignV::Middle,
+            })
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+}
+
+/// Centers children both horizontally and vertically.
+pub struct CenterMiddle {
+    inner: Container,
+}
+
+impl CenterMiddle {
+    pub fn new() -> Self {
+        Self {
+            inner: Container::new()
+                .with_width(Constraint::Fraction(1.0))
+                .with_height(Constraint::Fraction(1.0)),
+        }
+    }
+}
+
+impl Widget for CenterMiddle {
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+            .with_alignment(Alignment {
+                horizontal: AlignH::Center,
+                vertical: AlignV::Middle,
+            })
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+}
+
+/// Right-aligns children.
+pub struct Right {
+    inner: Container,
+}
+
+impl Right {
+    pub fn new() -> Self {
+        Self {
+            inner: Container::new()
+                .with_width(Constraint::Fraction(1.0))
+                .with_height(Constraint::Auto),
+        }
+    }
+}
+
+impl Widget for Right {
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+            .with_alignment(Alignment {
+                horizontal: AlignH::Right,
+                vertical: AlignV::Top,
+            })
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+}
+```
 
 #### 4.2 Group Containers
 
@@ -149,7 +342,7 @@ impl VerticalGroup {
     pub fn new() -> Self {
         Self {
             inner: Container::new()
-                .with_width(Constraint::Ratio(1.0))
+                .with_width(Constraint::Fraction(1.0))
                 .with_height(Constraint::Auto),
         }
     }
@@ -161,15 +354,41 @@ impl Widget for VerticalGroup {
     }
 
     fn layout(&self) -> LayoutHints {
-        // Set overflow: hidden hidden in layout hints
-        self.inner.layout().with_overflow(OverflowSettings::both(Overflow::Hidden))
+        self.inner.layout()
+            .with_overflow(OverflowSettings::both(Overflow::Hidden))
+    }
+}
+
+/// Horizontal layout that shrinks to content height.
+pub struct HorizontalGroup {
+    inner: Container,
+}
+
+impl HorizontalGroup {
+    pub fn new() -> Self {
+        Self {
+            inner: Container::new()
+                .with_width(Constraint::Fraction(1.0))
+                .with_height(Constraint::Auto),
+        }
+    }
+}
+
+impl Widget for HorizontalGroup {
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Horizontal)
+    }
+
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+            .with_overflow(OverflowSettings::both(Overflow::Hidden))
     }
 }
 ```
 
-Same pattern for **HorizontalGroup**.
-
 #### 4.3 ItemGrid
+
+ItemGrid must override `layout_type()` to return Grid and expose its config:
 
 ```rust
 /// Grid with dynamic column configuration.
@@ -186,7 +405,7 @@ impl ItemGrid {
     pub fn new() -> Self {
         Self {
             inner: Container::new()
-                .with_width(Constraint::Ratio(1.0))
+                .with_width(Constraint::Fraction(1.0))
                 .with_height(Constraint::Auto),
             config: GridConfig::default(),
             stretch_height: false,
@@ -206,7 +425,54 @@ impl ItemGrid {
         self
     }
 
-    // ... more builders
+    pub fn with_max_column_width(mut self, width: u16) -> Self {
+        self.max_column_width = Some(width);
+        self
+    }
+
+    pub fn with_regular(mut self, regular: bool) -> Self {
+        self.regular = regular;
+        self
+    }
+
+    /// Get the computed grid config based on reactive properties.
+    pub fn grid_config(&self) -> GridConfig {
+        let mut config = self.config.clone();
+
+        if let Some(min) = self.min_column_width {
+            config = config.with_min_column_width(min);
+        }
+        if let Some(max) = self.max_column_width {
+            config = config.with_max_column_width(max);
+        }
+        if self.regular {
+            config = config.with_regular(true);
+        }
+        if self.stretch_height {
+            config = config.with_stretch_height(true);
+        }
+
+        config
+    }
+}
+
+impl Widget for ItemGrid {
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Grid)  // REQUIRED: Tells layout system to use GridLayout
+    }
+
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+    }
+
+    /// Provide grid config to layout system.
+    fn grid_config(&self) -> Option<&GridConfig> {
+        Some(&self.config)
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        "ItemGrid"
+    }
 }
 ```
 
@@ -311,18 +577,19 @@ impl HorizontalScroll {
 
 ### 6. ContentSwitcher Design
 
+ContentSwitcher uses `Display::None` to hide non-current children:
+
 ```rust
 // src/widgets/content_switcher.rs
 
 use std::collections::HashMap;
 
 /// Container that shows one child at a time.
+/// Hidden children have display: none and are skipped in layout.
 pub struct ContentSwitcher {
     inner: Container,
-    /// Currently visible child ID.
+    /// Currently visible child ID (required, non-empty).
     current: Option<String>,
-    /// Child visibility states.
-    visibility: HashMap<String, bool>,
 }
 
 /// Message posted when current changes.
@@ -335,12 +602,14 @@ impl ContentSwitcher {
         Self {
             inner: Container::new().with_height(Constraint::Auto),
             current: None,
-            visibility: HashMap::new(),
         }
     }
 
     pub fn with_initial(mut self, id: impl Into<String>) -> Self {
-        self.current = Some(id.into());
+        let id = id.into();
+        if !id.is_empty() {
+            self.current = Some(id);
+        }
         self
     }
 
@@ -350,18 +619,11 @@ impl ContentSwitcher {
     }
 
     /// Set currently visible child.
-    /// Returns CurrentChanged message to post.
+    /// Panics if id is empty string.
     pub fn set_current(&mut self, id: Option<String>) -> CurrentChanged {
-        // Hide old current
-        if let Some(old) = &self.current {
-            self.visibility.insert(old.clone(), false);
+        if let Some(ref id) = id {
+            assert!(!id.is_empty(), "ContentSwitcher child ID cannot be empty");
         }
-
-        // Show new current
-        if let Some(new) = &id {
-            self.visibility.insert(new.clone(), true);
-        }
-
         self.current = id;
 
         CurrentChanged {
@@ -369,27 +631,65 @@ impl ContentSwitcher {
         }
     }
 
-    /// Check if child should be displayed.
-    pub fn is_visible(&self, id: &str) -> bool {
-        self.visibility.get(id).copied().unwrap_or(false)
+    /// Compute display property for a child widget by ID.
+    /// Returns Display::Block for current child, Display::None for others.
+    pub fn child_display(&self, child_id: &str) -> Display {
+        if self.current.as_deref() == Some(child_id) {
+            Display::Block
+        } else {
+            Display::None
+        }
     }
 
     /// Add content with ID.
+    /// Panics if id is empty.
     pub fn add_content(&mut self, id: impl Into<String>, set_current: bool) {
         let id = id.into();
-        let visible = set_current || self.current.is_none();
-        self.visibility.insert(id.clone(), visible);
+        assert!(!id.is_empty(), "ContentSwitcher child ID cannot be empty");
 
         if set_current || self.current.is_none() {
             self.current = Some(id);
         }
     }
 }
+
+impl Widget for ContentSwitcher {
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout()
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        "ContentSwitcher"
+    }
+}
 ```
 
 ### 7. Tab Widgets Design
 
-#### 7.1 Tab Widget
+#### 7.1 ID Prefix System
+
+TabbedContent uses a prefix system to coordinate Tab and TabPane IDs:
+
+```rust
+/// Prefix for content tab IDs (internal).
+const CONTENT_TAB_PREFIX: &str = "--content-tab-";
+
+/// Add prefix to create internal tab ID from pane ID.
+fn add_tab_prefix(pane_id: &str) -> String {
+    format!("{}{}", CONTENT_TAB_PREFIX, pane_id)
+}
+
+/// Remove prefix to get pane ID from internal tab ID.
+fn remove_tab_prefix(tab_id: &str) -> Option<&str> {
+    tab_id.strip_prefix(CONTENT_TAB_PREFIX)
+}
+```
+
+#### 7.2 Tab Widget
 
 ```rust
 // src/widgets/tabs.rs
@@ -417,9 +717,13 @@ pub struct TabEnabled {
 }
 
 impl Tab {
+    /// Create a new tab.
+    /// Panics if id is empty.
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        let id = id.into();
+        assert!(!id.is_empty(), "Tab ID cannot be empty");
         Self {
-            id: id.into(),
+            id,
             label: label.into(),
             disabled: false,
             hidden: false,
@@ -446,6 +750,15 @@ impl Tab {
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
+
+    /// Compute display property based on hidden state.
+    pub fn display(&self) -> Display {
+        if self.hidden {
+            Display::None
+        } else {
+            Display::Block
+        }
+    }
 }
 
 impl Widget for Tab {
@@ -466,6 +779,7 @@ impl Widget for Tab {
         LayoutHints::default()
             .with_width(Constraint::Auto)
             .with_height(Constraint::Length(1))
+            .with_display(self.display())
     }
 
     fn widget_type_name(&self) -> &'static str {
@@ -474,7 +788,7 @@ impl Widget for Tab {
 }
 ```
 
-#### 7.2 Tabs Widget (Tab Bar)
+#### 7.3 Tabs Widget (Tab Bar)
 
 ```rust
 /// Tab bar containing multiple tabs.
@@ -635,7 +949,7 @@ impl Tabs {
         }
     }
 
-    /// Hide a tab.
+    /// Hide a tab (sets display: none).
     pub fn hide(&mut self, id: &str) {
         if let Some(tab) = self.tabs.iter_mut().find(|t| t.id() == id) {
             tab.hidden = true;
@@ -657,7 +971,7 @@ impl Widget for Tabs {
 
     fn layout(&self) -> LayoutHints {
         LayoutHints::default()
-            .with_width(Constraint::Ratio(1.0))
+            .with_width(Constraint::Fraction(1.0))
             .with_height(Constraint::Length(2))  // 1 for tabs, 1 for underline
     }
 
@@ -687,7 +1001,7 @@ impl ActionHandler for Tabs {
 }
 ```
 
-#### 7.3 Underline Widget
+#### 7.4 Underline Widget
 
 ```rust
 /// Animated underline indicator for tabs.
@@ -748,7 +1062,7 @@ impl Widget for Underline {
 
     fn layout(&self) -> LayoutHints {
         LayoutHints::default()
-            .with_width(Constraint::Ratio(1.0))
+            .with_width(Constraint::Fraction(1.0))
             .with_height(Constraint::Length(1))
     }
 
@@ -758,43 +1072,50 @@ impl Widget for Underline {
 }
 ```
 
-#### 7.4 TabPane Widget
+#### 7.5 TabPane Widget
 
 ```rust
 /// A pane of content associated with a tab.
 pub struct TabPane {
     inner: Container,
+    id: String,  // Required, non-empty
     title: String,
     disabled: bool,
 }
 
 /// TabPane disabled message.
 pub struct TabPaneDisabled {
-    pub pane_id: Option<String>,
+    pub pane_id: String,
 }
 
 /// TabPane enabled message.
 pub struct TabPaneEnabled {
-    pub pane_id: Option<String>,
+    pub pane_id: String,
 }
 
 /// TabPane focused (descendant received focus).
 pub struct TabPaneFocused {
-    pub pane_id: Option<String>,
+    pub pane_id: String,
 }
 
 impl TabPane {
-    pub fn new(title: impl Into<String>) -> Self {
+    /// Create a new TabPane.
+    /// Panics if id is empty.
+    pub fn new(id: impl Into<String>, title: impl Into<String>) -> Self {
+        let id = id.into();
+        assert!(!id.is_empty(), "TabPane ID cannot be empty");
         Self {
-            inner: Container::new().with_height(Constraint::Auto),
+            inner: Container::new()
+                .with_id(&id)
+                .with_height(Constraint::Auto),
+            id,
             title: title.into(),
             disabled: false,
         }
     }
 
-    pub fn with_id(mut self, id: impl Into<String>) -> Self {
-        self.inner = self.inner.with_id(id);
-        self
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     pub fn title(&self) -> &str {
@@ -829,12 +1150,15 @@ impl Widget for TabPane {
 }
 ```
 
-#### 7.5 TabbedContent Widget
+#### 7.6 TabbedContent Widget
 
 ```rust
+/// Prefix for content tab IDs.
+const CONTENT_TAB_PREFIX: &str = "--content-tab-";
+
 /// Container with tabs and switchable content panes.
 pub struct TabbedContent {
-    inner: Container,
+    id: Option<String>,
     tabs: Tabs,
     switcher: ContentSwitcher,
 }
@@ -842,41 +1166,53 @@ pub struct TabbedContent {
 impl TabbedContent {
     pub fn new() -> Self {
         Self {
-            inner: Container::new().with_height(Constraint::Auto),
+            id: None,
             tabs: Tabs::new(),
             switcher: ContentSwitcher::new(),
         }
     }
 
-    /// Get active pane ID.
-    pub fn active(&self) -> Option<&str> {
-        self.tabs.active()
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 
-    /// Set active pane.
-    pub fn set_active(&mut self, id: impl Into<String>) -> Option<TabActivated> {
-        let id = id.into();
-        let result = self.tabs.set_active(&id);
+    /// Get active pane ID (without prefix).
+    pub fn active(&self) -> Option<&str> {
+        self.tabs.active().and_then(|tab_id| {
+            tab_id.strip_prefix(CONTENT_TAB_PREFIX)
+        })
+    }
+
+    /// Set active pane by pane ID (not tab ID).
+    pub fn set_active(&mut self, pane_id: impl Into<String>) -> Option<TabActivated> {
+        let pane_id = pane_id.into();
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+
+        let result = self.tabs.set_active(&tab_id);
         if result.is_some() {
-            self.switcher.set_current(Some(id));
+            self.switcher.set_current(Some(pane_id));
         }
         result
     }
 
     /// Add a pane.
+    /// Panics if pane has empty ID.
     pub fn add_pane(&mut self, pane: TabPane) {
-        let id = pane.inner.id().unwrap_or("").to_string();
-        let tab = Tab::new(&id, pane.title())
+        let pane_id = pane.id().to_string();
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+
+        let tab = Tab::new(&tab_id, pane.title())
             .with_disabled(pane.is_disabled());
 
         self.tabs.add_tab(tab);
-        self.switcher.add_content(&id, false);
+        self.switcher.add_content(&pane_id, false);
     }
 
-    /// Remove a pane.
-    pub fn remove_pane(&mut self, id: &str) {
-        self.tabs.remove_tab(id);
-        // Note: actual pane removal requires compose tree manipulation
+    /// Remove a pane by pane ID.
+    pub fn remove_pane(&mut self, pane_id: &str) {
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.remove_tab(&tab_id);
     }
 
     /// Clear all panes.
@@ -885,29 +1221,49 @@ impl TabbedContent {
         self.switcher.set_current(None);
     }
 
-    /// Get a tab by pane ID.
+    /// Get a tab by pane ID (uses prefix internally).
     pub fn get_tab(&self, pane_id: &str) -> Option<&Tab> {
-        self.tabs.tabs.iter().find(|t| t.id() == pane_id)
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.tabs.iter().find(|t| t.id() == tab_id)
     }
 
-    /// Disable a tab.
-    pub fn disable_tab(&mut self, id: &str) {
-        self.tabs.disable(id);
+    /// Disable a tab by pane ID.
+    pub fn disable_tab(&mut self, pane_id: &str) {
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.disable(&tab_id);
     }
 
-    /// Enable a tab.
-    pub fn enable_tab(&mut self, id: &str) {
-        self.tabs.enable(id);
+    /// Enable a tab by pane ID.
+    pub fn enable_tab(&mut self, pane_id: &str) {
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.enable(&tab_id);
     }
 
-    /// Hide a tab.
-    pub fn hide_tab(&mut self, id: &str) {
-        self.tabs.hide(id);
+    /// Hide a tab by pane ID.
+    pub fn hide_tab(&mut self, pane_id: &str) {
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.hide(&tab_id);
     }
 
-    /// Show a tab.
-    pub fn show_tab(&mut self, id: &str) {
-        self.tabs.show(id);
+    /// Show a tab by pane ID.
+    pub fn show_tab(&mut self, pane_id: &str) {
+        let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
+        self.tabs.show(&tab_id);
+    }
+}
+
+impl Widget for TabbedContent {
+    fn layout(&self) -> LayoutHints {
+        LayoutHints::default()
+            .with_height(Constraint::Auto)
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        "TabbedContent"
     }
 }
 ```
@@ -916,15 +1272,119 @@ impl TabbedContent {
 
 Based on research: Python Textual's Collapsible has **no animation** - it uses instant `display: none` toggle.
 
+Collapsible is composed of two internal widgets:
+- **CollapsibleTitle** - Focusable header with toggle keyboard support
+- **Contents** - Container for child content (hidden when collapsed)
+
 ```rust
 // src/widgets/collapsible.rs
 
-/// Collapsible container with toggle header.
-pub struct Collapsible {
-    inner: Container,
+/// Focusable collapsible header.
+pub struct CollapsibleTitle {
     title: String,
     collapsed: bool,
     bindings: BindingManager,
+}
+
+impl CollapsibleTitle {
+    pub fn new(title: impl Into<String>) -> Self {
+        let mut bindings = BindingManager::new();
+        bindings.add(Binding::new("enter", "toggle").with_show(false));
+
+        Self {
+            title: title.into(),
+            collapsed: false,
+            bindings,
+        }
+    }
+
+    pub fn set_collapsed(&mut self, collapsed: bool) {
+        self.collapsed = collapsed;
+    }
+
+    fn render_arrow(&self) -> &'static str {
+        if self.collapsed { "▶" } else { "▼" }
+    }
+}
+
+impl Widget for CollapsibleTitle {
+    fn focusable(&self) -> bool {
+        true
+    }
+
+    fn render(&self, area: Rect, frame: &mut Frame) {
+        let text = format!("{} {}", self.render_arrow(), self.title);
+        let paragraph = Paragraph::new(text);
+        frame.render_widget(paragraph, area);
+    }
+
+    fn layout(&self) -> LayoutHints {
+        LayoutHints::default()
+            .with_width(Constraint::Auto)
+            .with_height(Constraint::Auto)
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        "CollapsibleTitle"
+    }
+}
+
+impl ActionHandler for CollapsibleTitle {
+    fn run_action(&mut self, action: &ParsedAction) -> Result<bool, ActionError> {
+        match action.name.as_str() {
+            "toggle" => Ok(true),  // Signal to parent Collapsible
+            _ => Ok(false)
+        }
+    }
+
+    fn bindings(&self) -> &[Binding] {
+        self.bindings.bindings()
+    }
+}
+
+/// Container for collapsible content.
+/// Has display: none when parent is collapsed.
+pub struct Contents {
+    inner: Container,
+    display: Display,
+}
+
+impl Contents {
+    pub fn new() -> Self {
+        Self {
+            inner: Container::new()
+                .with_width(Constraint::Fraction(1.0))
+                .with_height(Constraint::Auto),
+            display: Display::Block,
+        }
+    }
+
+    pub fn set_visible(&mut self, visible: bool) {
+        self.display = if visible { Display::Block } else { Display::None };
+    }
+}
+
+impl Widget for Contents {
+    fn layout(&self) -> LayoutHints {
+        self.inner.layout().with_display(self.display)
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
+    }
+
+    fn widget_type_name(&self) -> &'static str {
+        "Contents"
+    }
+}
+
+/// Collapsible container with toggle header.
+/// Composed of CollapsibleTitle + Contents.
+pub struct Collapsible {
+    id: Option<String>,
+    title: CollapsibleTitle,
+    contents: Contents,
+    collapsed: bool,  // Default: true (starts collapsed)
 }
 
 /// Collapsible toggled message.
@@ -935,31 +1395,33 @@ pub struct Toggled {
 
 impl Collapsible {
     pub fn new(title: impl Into<String>) -> Self {
-        let mut bindings = BindingManager::new();
-        bindings.add(Binding::new("enter", "toggle").with_show(false));
-
         Self {
-            inner: Container::new()
-                .with_width(Constraint::Ratio(1.0))
-                .with_height(Constraint::Auto),
-            title: title.into(),
-            collapsed: false,
-            bindings,
+            id: None,
+            title: CollapsibleTitle::new(title),
+            contents: Contents::new(),
+            collapsed: true,  // Default collapsed per Python Textual
         }
     }
 
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
-        self.inner = self.inner.with_id(id);
+        self.id = Some(id.into());
         self
     }
 
+    /// Set initial collapsed state (default: true).
     pub fn with_collapsed(mut self, collapsed: bool) -> Self {
         self.collapsed = collapsed;
+        self.sync_state();
         self
+    }
+
+    fn sync_state(&mut self) {
+        self.title.set_collapsed(self.collapsed);
+        self.contents.set_visible(!self.collapsed);
     }
 
     pub fn title(&self) -> &str {
-        &self.title
+        &self.title.title
     }
 
     pub fn is_collapsed(&self) -> bool {
@@ -970,8 +1432,9 @@ impl Collapsible {
     pub fn expand(&mut self) -> Option<Toggled> {
         if self.collapsed {
             self.collapsed = false;
+            self.sync_state();
             Some(Toggled {
-                collapsible_id: self.inner.id().map(|s| s.to_string()),
+                collapsible_id: self.id.clone(),
                 collapsed: false,
             })
         } else {
@@ -983,8 +1446,9 @@ impl Collapsible {
     pub fn collapse(&mut self) -> Option<Toggled> {
         if !self.collapsed {
             self.collapsed = true;
+            self.sync_state();
             Some(Toggled {
-                collapsible_id: self.inner.id().map(|s| s.to_string()),
+                collapsible_id: self.id.clone(),
                 collapsed: true,
             })
         } else {
@@ -995,58 +1459,48 @@ impl Collapsible {
     /// Toggle collapsed state.
     pub fn toggle(&mut self) -> Toggled {
         self.collapsed = !self.collapsed;
+        self.sync_state();
         Toggled {
-            collapsible_id: self.inner.id().map(|s| s.to_string()),
+            collapsible_id: self.id.clone(),
             collapsed: self.collapsed,
         }
-    }
-
-    /// Check if content should be displayed.
-    pub fn content_visible(&self) -> bool {
-        !self.collapsed
     }
 }
 
 impl Widget for Collapsible {
-    fn focusable(&self) -> bool {
-        true
+    fn layout(&self) -> LayoutHints {
+        LayoutHints::default()
+            .with_width(Constraint::Fraction(1.0))
+            .with_height(Constraint::Auto)
     }
 
-    fn layout(&self) -> LayoutHints {
-        self.inner.layout()
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
     }
 
     fn widget_type_name(&self) -> &'static str {
         "Collapsible"
     }
 }
+```
 
-impl ActionHandler for Collapsible {
-    fn run_action(&mut self, action: &ParsedAction) -> Result<bool, ActionError> {
-        match action.name.as_str() {
-            "toggle" => {
-                self.toggle();
-                Ok(true)
-            }
-            "expand" => {
-                self.expand();
-                Ok(true)
-            }
-            "collapse" => {
-                self.collapse();
-                Ok(true)
-            }
-            _ => Ok(false)
-        }
-    }
+### 9. Widget Trait Extension
 
-    fn bindings(&self) -> &[Binding] {
-        self.bindings.bindings()
+Add `grid_config()` method to Widget trait for ItemGrid support:
+
+```rust
+// In widget.rs:
+pub trait Widget {
+    // ... existing methods ...
+
+    /// Return grid configuration if this widget uses grid layout.
+    fn grid_config(&self) -> Option<&GridConfig> {
+        None
     }
 }
 ```
 
-### 9. File Organization
+### 10. File Organization
 
 ```
 src/widgets/
@@ -1059,10 +1513,10 @@ src/widgets/
 │                       # + ScrollableContainer, VerticalScroll, HorizontalScroll
 ├── content_switcher.rs # ContentSwitcher (NEW)
 ├── tabs.rs             # Tab, Tabs, Underline, TabPane, TabbedContent (NEW)
-└── collapsible.rs      # Collapsible (NEW)
+└── collapsible.rs      # CollapsibleTitle, Contents, Collapsible (NEW)
 ```
 
-### 10. Dependencies Between Widgets
+### 11. Dependencies Between Widgets
 
 ```
 Container (base)
@@ -1083,42 +1537,48 @@ Tab, Tabs, Underline (new)
 ├── TabPane (new)
 └── TabbedContent (new - composes Tabs + ContentSwitcher)
 
-Collapsible (new - standalone)
+CollapsibleTitle, Contents (new)
+└── Collapsible (new - composes Title + Contents)
 ```
 
-### 11. Implementation Order
+### 12. Implementation Order
 
-1. **Alignment Extensions** (LayoutHints)
-   - Add Alignment struct to geometry/layout
-   - Extend LayoutHints with alignment field
+1. **Core Extensions** (Required First)
+   - Add `Display` enum to geometry.rs
+   - Add `Alignment` struct to geometry.rs
+   - Extend `LayoutHints` with display and alignment
+   - Add `grid_config()` to Widget trait
+   - Update layout algorithms to filter `display: none` widgets
+   - Update layout algorithms to apply alignment
 
-2. **Alignment Containers** (Trivial)
+2. **Alignment Containers** (Simple)
    - Center, Middle, Right, CenterMiddle
 
-3. **Group Containers** (Trivial)
+3. **Group Containers** (Simple)
    - VerticalGroup, HorizontalGroup
 
 4. **ScrollableContainer** (Medium)
    - Add keyboard bindings
    - Implement ActionHandler
 
-5. **VerticalScroll, HorizontalScroll** (Trivial)
+5. **VerticalScroll, HorizontalScroll** (Simple)
    - Wrappers with overflow presets
 
 6. **ItemGrid** (Medium)
    - Reactive properties
-   - GridLayout integration
+   - Override grid_config()
 
 7. **ContentSwitcher** (Medium)
-   - Visibility management
+   - Display-based visibility management
    - CurrentChanged message
 
 8. **Tab Widgets** (Complex)
-   - Tab, Tabs, Underline
-   - TabPane, TabbedContent
-   - Message flow coordination
+   - Tab (with display for hidden)
+   - Tabs, Underline
+   - TabPane (required ID)
+   - TabbedContent (ID prefix system)
 
 9. **Collapsible** (Medium)
-   - Toggle state
-   - Keyboard binding (Enter)
-   - No animation (instant toggle)
+   - CollapsibleTitle, Contents
+   - Collapsible (composed)
+   - Default collapsed = true
