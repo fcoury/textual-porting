@@ -60,29 +60,29 @@
 - [x] Task: Write tests for Middle
 
 ### 3.7 ScrollableContainer
-- [ ] Task: Implement ScrollableContainer struct
-- [ ] Task: Integrate vertical ScrollBar widget
-- [ ] Task: Integrate horizontal ScrollBar widget
-- [ ] Task: Implement scroll_to_widget() method
-- [ ] Task: Implement scroll_home() method
-- [ ] Task: Implement scroll_end() method
-- [ ] Task: Implement scroll_page_up() method
-- [ ] Task: Implement scroll_page_down() method
-- [ ] Task: Add keyboard scrolling bindings
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for ScrollableContainer
+- [x] Task: Implement ScrollableContainer struct (wraps ScrollView, adds focusability)
+- [x] Task: Integrate vertical ScrollBar widget (via ScrollView inheritance)
+- [x] Task: Integrate horizontal ScrollBar widget (via ScrollView inheritance)
+- [x] Task: Implement scroll_to_widget() method
+- [x] Task: Implement scroll_home() method (action_scroll_home)
+- [x] Task: Implement scroll_end() method (action_scroll_end)
+- [x] Task: Implement scroll_page_up() method (action_page_up)
+- [x] Task: Implement scroll_page_down() method (action_page_down)
+- [x] Task: Add keyboard scrolling action methods (app dispatches via bindings)
+- [x] Task: Add DEFAULT_CSS (via layout hints - inherits from ScrollView)
+- [x] Task: Write tests for ScrollableContainer
 
 ### 3.8 VerticalScroll Container
-- [ ] Task: Implement VerticalScroll extending ScrollableContainer
-- [ ] Task: Show only vertical scroll bar
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for VerticalScroll
+- [x] Task: Implement VerticalScroll extending ScrollableContainer
+- [x] Task: Show only vertical scroll bar (overflow-x: hidden, overflow-y: auto)
+- [x] Task: Add DEFAULT_CSS (via overflow settings)
+- [x] Task: Write tests for VerticalScroll
 
 ### 3.9 HorizontalScroll Container
-- [ ] Task: Implement HorizontalScroll extending ScrollableContainer
-- [ ] Task: Show only horizontal scroll bar
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for HorizontalScroll
+- [x] Task: Implement HorizontalScroll extending ScrollableContainer
+- [x] Task: Show only horizontal scroll bar (overflow-x: auto, overflow-y: hidden)
+- [x] Task: Add DEFAULT_CSS (via overflow settings)
+- [x] Task: Write tests for HorizontalScroll
 
 ### 3.10 TabPane Widget
 - [ ] Task: Implement TabPane struct
