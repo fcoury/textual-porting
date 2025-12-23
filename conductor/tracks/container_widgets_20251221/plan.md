@@ -10,11 +10,11 @@
 - [x] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
 ## Phase 2: Design & Planning
-- [x] Task: Design Container base trait/struct
-- [x] Task: Design scroll bar widget integration
-- [x] Task: Design Tab/TabPane/TabbedContent relationship
-- [x] Task: Plan collapsible animation approach (Result: No animation - instant toggle via display:none)
-- [x] Task: Write technical design document
+- [x] Task: Design Container base trait/struct [a89f914]
+- [x] Task: Design scroll bar widget integration [a89f914]
+- [x] Task: Design Tab/TabPane/TabbedContent relationship [a89f914]
+- [x] Task: Plan collapsible animation approach (Result: No animation - instant toggle via display:none) [a89f914]
+- [x] Task: Write technical design document [a89f914]
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
