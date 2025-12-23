@@ -1,6 +1,6 @@
 # Plan: Container Widgets
 
-## Phase 1: Analysis & Research
+## Phase 1: Analysis & Research [7b4e017]
 - [x] Task: Study Python Textual containers.py implementation [b8379a3]
 - [x] Task: Analyze ScrollableContainer and scroll methods [9ccbbdb]
 - [x] Task: Document _tabbed_content.py and _tabs.py in detail [7b9ffa7]
