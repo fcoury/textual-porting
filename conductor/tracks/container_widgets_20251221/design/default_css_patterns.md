@@ -24,12 +24,13 @@ Vertical {
 }
 ```
 
-### VerticalGroup (Collapsing)
+### VerticalGroup (Non-expanding)
 ```css
 VerticalGroup {
-    width: auto;
+    width: 1fr;
     height: auto;
     layout: vertical;
+    overflow: hidden hidden;
 }
 ```
 
@@ -42,12 +43,13 @@ Horizontal {
 }
 ```
 
-### HorizontalGroup (Collapsing)
+### HorizontalGroup (Non-expanding)
 ```css
 HorizontalGroup {
-    width: auto;
+    width: 1fr;
     height: auto;
     layout: horizontal;
+    overflow: hidden hidden;
 }
 ```
 
@@ -59,6 +61,21 @@ Grid {
     layout: grid;
 }
 ```
+
+### ItemGrid (Dynamic Grid)
+```css
+ItemGrid {
+    width: 1fr;
+    height: auto;
+    layout: grid;
+}
+```
+
+**Note**: ItemGrid also has reactive properties that affect grid layout:
+- `stretch_height`: Expands widgets to fill row height
+- `min_column_width`: Minimum column width constraint
+- `max_column_width`: Maximum column width constraint
+- `regular`: Forces equal items per row
 
 ## Alignment Containers
 
@@ -187,6 +204,30 @@ TabbedContent {
 }
 ```
 
+**Note**: `ContentTabs` is an internal variant of `Tabs` used within TabbedContent for coordination. It inherits the same CSS as `Tabs`.
+
+### Underline (Internal Widget)
+```css
+Underline {
+    width: 1fr;
+    height: 1;
+
+    > .underline--bar {
+        color: $block-cursor-background;
+        background: $foreground 10%;
+    }
+
+    &:ansi {
+        text-style: dim;
+    }
+}
+```
+
+**Note**: `Underline` is an internal widget used by `Tabs` to render the animated indicator bar beneath the active tab. It has reactive properties:
+- `highlight_start`: Starting cell position for the highlight
+- `highlight_end`: Ending cell position for the highlight
+- `show_highlight`: Boolean controlling visibility
+
 ## Collapsible Widgets
 
 ### CollapsibleTitle
@@ -243,10 +284,11 @@ ContentSwitcher {
 |--------|-------|--------|--------|---------|
 | Container | 1fr | 1fr | vertical | - |
 | Vertical | 1fr | 1fr | vertical | - |
-| VerticalGroup | auto | auto | vertical | Shrink-to-fit |
+| VerticalGroup | 1fr | auto | vertical | overflow: hidden hidden |
 | Horizontal | 1fr | 1fr | horizontal | - |
-| HorizontalGroup | auto | auto | horizontal | Shrink-to-fit |
+| HorizontalGroup | 1fr | auto | horizontal | overflow: hidden hidden |
 | Grid | 1fr | 1fr | grid | - |
+| ItemGrid | 1fr | auto | grid | Reactive column properties |
 | Center | 1fr | auto | - | align-horizontal: center |
 | Middle | auto | 1fr | - | align-vertical: middle |
 | CenterMiddle | 1fr | 1fr | - | align: center middle |
@@ -255,6 +297,7 @@ ContentSwitcher {
 | HorizontalScroll | - | - | - | overflow-y: hidden, overflow-x: auto |
 | Tab | auto | 1 | - | Opacity states |
 | Tabs | 1fr | 2 | - | Contains Underline |
+| Underline | 1fr | 1 | - | Internal: animated highlight |
 | TabPane | - | auto | - | - |
 | TabbedContent | - | auto | - | ContentTabs dock: top |
 | CollapsibleTitle | auto | auto | - | Hover/focus states |
