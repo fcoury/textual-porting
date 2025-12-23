@@ -250,6 +250,42 @@ fn get_effective_display(
 }
 ```
 
+### 2.3 ComposeContext Extensions
+
+ComposeContext needs additional methods to support CloneableWidget for composite widgets (TabbedContent, Collapsible, TabPane):
+
+```rust
+// In compose.rs - extend ComposeContext:
+
+impl ComposeContext {
+    // Existing methods...
+
+    /// Add a widget that implements CloneableWidget.
+    /// Clones the widget and adds it to the registry.
+    /// Used by composite widgets that store content via Box<dyn CloneableWidget>.
+    pub fn add_cloneable(&mut self, widget: &dyn CloneableWidget) -> WidgetId {
+        let boxed = widget.clone_box();
+        self.add_boxed_widget(boxed)
+    }
+
+    /// Internal: Add a boxed widget to the registry.
+    fn add_boxed_widget(&mut self, widget: Box<dyn CloneableWidget>) -> WidgetId {
+        // Implementation: register the boxed widget and return its ID
+        // The boxed widget implements Widget via CloneableWidget supertrait
+        let id = self.registry.register_boxed(widget);
+        if let Some(parent) = self.current_parent {
+            self.registry.add_child(parent, id);
+        }
+        id
+    }
+}
+```
+
+**Usage Pattern**:
+- Composite widgets (TabPane, Collapsible) store content as `Vec<Box<dyn CloneableWidget>>`
+- In compose(), iterate and call `ctx.add_cloneable(widget.as_ref())`
+- The method clones via `clone_box()` and adds to registry under current parent
+
 ### 3. Layout System Integration
 
 #### 3.1 Layout Filtering for Display::None
@@ -1543,13 +1579,18 @@ impl Widget for Underline {
 
 #### 7.5 TabPane Widget
 
+TabPane stores its content using CloneableWidget so content survives cloning into TabbedContent.
+
 ```rust
 /// A pane of content associated with a tab.
+/// Implements Clone via clone_with_content() for TabbedContent storage.
+#[derive(Clone)]
 pub struct TabPane {
-    inner: Container,
     id: String,  // Required, non-empty
     title: String,
     disabled: bool,
+    /// Content widgets stored for compose (require Clone).
+    content: Vec<Box<dyn CloneableWidget>>,
 }
 
 /// TabPane disabled message.
@@ -1574,16 +1615,20 @@ impl TabPane {
         let id = id.into();
         assert!(!id.is_empty(), "TabPane ID cannot be empty");
         Self {
-            inner: Container::new()
-                .with_id(&id)
-                .with_height(Constraint::Auto),
             id,
             title: title.into(),
             disabled: false,
+            content: Vec::new(),
         }
     }
 
-    pub fn id(&self) -> &str {
+    /// Add content widget. Widget must implement Clone.
+    pub fn with_content<W: Widget + Clone + 'static>(mut self, widget: W) -> Self {
+        self.content.push(Box::new(widget));
+        self
+    }
+
+    pub fn pane_id(&self) -> &str {
         &self.id
     }
 
@@ -1605,16 +1650,43 @@ impl TabPane {
 }
 
 impl Widget for TabPane {
-    fn render(&self, area: Rect, frame: &mut Frame) {
-        self.inner.render(area, frame);
+    /// Return the pane ID for ContentSwitcher visibility coordination.
+    fn id(&self) -> Option<&str> {
+        Some(&self.id)
     }
 
     fn layout(&self) -> LayoutHints {
-        self.inner.layout()
+        LayoutHints::default()
+            .with_height(Constraint::Auto)
+    }
+
+    fn layout_type(&self) -> Option<LayoutType> {
+        Some(LayoutType::Vertical)
     }
 
     fn widget_type_name(&self) -> &'static str {
         "TabPane"
+    }
+}
+
+/// TabPane compose() places content widgets as its children.
+impl Compose for TabPane {
+    fn compose(&self, ctx: &mut ComposeContext) {
+        for widget in &self.content {
+            ctx.add_cloneable(widget.as_ref());
+        }
+    }
+}
+
+// Manual Clone impl for TabPane to handle Box<dyn CloneableWidget>
+impl Clone for TabPane {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            title: self.title.clone(),
+            disabled: self.disabled,
+            content: self.content.iter().map(|w| w.clone_box()).collect(),
+        }
     }
 }
 ```
@@ -1663,9 +1735,9 @@ impl TabbedContent {
     }
 
     /// Add a TabPane widget. The pane is stored and placed under ContentSwitcher
-    /// during compose(). Pane must have an ID set.
+    /// during compose().
     pub fn with_pane(mut self, pane: TabPane) -> Self {
-        let pane_id = pane.id().expect("TabPane must have ID").to_string();
+        let pane_id = pane.pane_id().to_string();  // TabPane always has ID
         if self.active_id.is_none() {
             self.active_id = Some(pane_id.clone());
         }
@@ -1745,7 +1817,7 @@ impl Compose for TabbedContent {
         // Build Tabs widget from stored TabPanes
         let mut tabs = Tabs::new();
         for pane in &self.panes {
-            let pane_id = pane.id().unwrap();
+            let pane_id = pane.pane_id();  // Returns &str, not Option
             let tab_id = format!("{}{}", CONTENT_TAB_PREFIX, pane_id);
             let mut tab = Tab::new(&tab_id, pane.title());
 
@@ -2086,7 +2158,7 @@ impl Compose for Collapsible {
         ctx.add_with(contents, |ctx| {
             for widget in &self.content {
                 // Clone content widget into registry under Contents
-                ctx.add_boxed(widget.clone_box());
+                ctx.add_cloneable(widget.as_ref());
             }
         });
     }
@@ -2115,7 +2187,9 @@ impl Collapsible {
 
 ### 9. Widget Trait Extension Summary
 
-All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. This section summarizes the new APIs:
+All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. ComposeContext extensions are in **Section 2.3**. This section summarizes the new APIs:
+
+**Widget Trait Methods:**
 
 | Method | Return Type | Purpose |
 |--------|-------------|---------|
@@ -2125,13 +2199,26 @@ All Widget trait extensions are defined in **Section 2.1** and **Section 2.2**. 
 | `grid_config()` | `Option<&GridConfig>` | Grid configuration for ItemGrid |
 | `as_display_override()` | `Option<&dyn ChildDisplayOverride>` | Display override for child widgets |
 
-All methods have default implementations returning `None` or `0`, making them opt-in.
+**CloneableWidget Trait** (for composite widget content storage):
+
+| Method | Return Type | Purpose |
+|--------|-------------|---------|
+| `clone_box()` | `Box<dyn CloneableWidget>` | Clone a boxed widget for compose |
+
+**ComposeContext Methods:**
+
+| Method | Parameters | Purpose |
+|--------|------------|---------|
+| `add_cloneable()` | `&dyn CloneableWidget` | Add cloned widget from Box storage |
+
+All Widget trait methods have default implementations returning `None` or `0`, making them opt-in. CloneableWidget has a blanket impl for all `Widget + Clone + 'static` types.
 
 **Implementation Requirements**:
-- Widgets with IDs must implement `id()` (ContentSwitcher, TabbedContent panes)
+- Widgets with IDs must implement `id()` (TabPane, ContentSwitcher children)
 - Widgets using `Constraint::Auto` should implement `get_content_*()` methods
 - ItemGrid must implement `grid_config()` to return its computed configuration
 - Widgets that control child visibility must implement `as_display_override()` (ContentSwitcher)
+- Widgets stored in composite containers (TabPane content, Collapsible content) must implement `Clone`
 
 ### 10. File Organization
 
@@ -2187,6 +2274,8 @@ CollapsibleTitle, Contents (new)
      - `grid_config()` → `Option<&GridConfig>`
      - `as_display_override()` → `Option<&dyn ChildDisplayOverride>`
    - Add `ChildDisplayOverride` trait to widget.rs (see Section 2.2)
+   - Add `CloneableWidget` trait to widget.rs (for composite widget content storage)
+   - Extend ComposeContext with `add_cloneable()` method (see Section 2.3)
    - Update layout algorithms:
      - Filter `display: none` widgets via `get_effective_display()`
      - Two-pass constraint resolution for Fraction support
