@@ -48,16 +48,16 @@
 - [x] Task: Write tests for Grid [76f5a5a]
 
 ### 3.5 Center Container
-- [ ] Task: Implement Center extending Container
-- [ ] Task: Center child horizontally and vertically
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Center
+- [x] Task: Implement Center extending Container
+- [x] Task: Center child horizontally (alignment: center, width: 1fr, height: auto)
+- [x] Task: Add DEFAULT_CSS (via layout hints with alignment)
+- [x] Task: Write tests for Center
 
 ### 3.6 Middle Container
-- [ ] Task: Implement Middle extending Container
-- [ ] Task: Center child vertically only
-- [ ] Task: Add DEFAULT_CSS
-- [ ] Task: Write tests for Middle
+- [x] Task: Implement Middle extending Container
+- [x] Task: Center child vertically only (alignment: middle, width: auto, height: 1fr)
+- [x] Task: Add DEFAULT_CSS (via layout hints with alignment)
+- [x] Task: Write tests for Middle
 
 ### 3.7 ScrollableContainer
 - [ ] Task: Implement ScrollableContainer struct
