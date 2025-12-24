@@ -140,7 +140,7 @@
 
 - [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [aba3806]
 
-## Phase 4: Testing & Verification
+## Phase 4: Testing & Verification [checkpoint: bebbb26]
 - [x] Task: Create integration tests with nested containers
 - [x] Task: Create example app with tabs, collapsibles, scrolling
 - [x] Task: Test keyboard navigation
