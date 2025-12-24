@@ -210,7 +210,7 @@
 - [x] Task: Write snapshot tests for Label/Input/Digits using DEFAULT_CSS
 - [x] Task: Update Label/Input/Digits to use content-align, padding, text-opacity
 - [x] Task: Update DEFAULT_CSS selectors to match Python (including pseudo-classes)
-- [ ] Task: Conductor - User Manual Verification "Widget Parity Complete" (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification "Widget Parity Complete" (Protocol in workflow.md)
 
 **Completed in Phase 4:**
 - Created `tests/widget_snapshots.rs` with 29 snapshot tests for Button, Label, Input, Digits
@@ -284,14 +284,25 @@
 - Input cursor/selection colors should follow theme variables
 
 ## Phase 5: Example Parity
-- [ ] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
-- [ ] Task: Add integration test that renders calculator to buffer and snapshots output
-- [ ] Task: Update other examples to use widgets + TCSS where needed
-- [ ] Task: Add manual screenshot capture checklist for each example
+- [x] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
+- [x] Task: Add integration test that renders calculator to buffer and snapshots output
+- [x] Task: Update other examples to use widgets + TCSS where needed
+  - styled_app.rs already uses StyleManager + TCSS + class-based styling
+  - calculator.rs now uses full widget tree + Grid + TCSS
+  - hello_world.rs, theme_demo.rs intentionally use direct ratatui for simplicity
+  - Other demos serve as examples of alternative patterns (no conversion needed)
+- [x] Task: Add manual screenshot capture checklist for each example
+  - Created design/screenshot_checklist.md with verification points for all examples
 - [ ] Task: Conductor - User Manual Verification "Example Parity Complete" (Protocol in workflow.md)
 
 ## Phase 6: Verification and Regression Coverage
-- [ ] Task: Run full test suite and address failures
-- [ ] Task: Add visual regression snapshot set for core widgets and examples
-- [ ] Task: Document parity verification process in track notes
+- [x] Task: Run full test suite and address failures
+  - All 1938 tests pass (1934 existing + 4 new calculator tests)
+- [x] Task: Add visual regression snapshot set for core widgets and examples
+  - tests/widget_snapshots.rs: 29 tests covering Button, Label, Input, Digits
+  - tests/calculator_snapshot.rs: 4 tests covering calculator grid layout
+  - Total: 68 assertions verifying rendered output
+- [x] Task: Document parity verification process in track notes
+  - Created design/parity_verification.md with automated and manual verification steps
+  - Includes CSS parity checklist, pseudo-class support, border styles
 - [ ] Task: Conductor - User Manual Verification "Track Complete" (Protocol in workflow.md)
