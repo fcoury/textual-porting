@@ -8,7 +8,7 @@
 - [x] Task: Conductor - User Manual Verification 'Inventory Complete' (Protocol in workflow.md) (b7ffb5d)
 
 ## Phase 2: Port `textual/examples` (Core Examples)
-- [ ] Task: Port layout/interaction examples (breakpoints, clock, five_by_five)
+- [~] Task: Port layout/interaction examples (breakpoints, clock, five_by_five)
 - [ ] Task: Port data/text examples (dictionary, markdown, json_tree, code_browser)
 - [ ] Task: Port showcase examples (merlin, mother, pride, sidebar, splash, theme_sandbox, color_command)
 - [ ] Task: Add integration/snapshot tests for each ported example with style assertions
