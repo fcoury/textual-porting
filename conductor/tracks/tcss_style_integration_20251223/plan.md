@@ -20,26 +20,26 @@
 ## Phase 3: Implementation
 
 ### 3.1 Core StyleManager
-- [ ] Task: Write tests for StyleManager construction and basic API
-- [ ] Task: Implement StyleManager struct with StyleSheet, ThemeRegistry, Animator, HotReloadManager
-- [ ] Task: Write tests for register_widget_defaults() parsing and merging
-- [ ] Task: Implement register_widget_defaults::<W>() with DEFAULT_CSS parsing
+- [x] Task: Write tests for StyleManager construction and basic API [63a3439]
+- [x] Task: Implement StyleManager struct with StyleSheet, ThemeRegistry, Animator, HotReloadManager [63a3439]
+- [x] Task: Write tests for register_widget_defaults() parsing and merging
+- [x] Task: Implement register_widget_defaults::<W>() with DEFAULT_CSS parsing
 - [ ] Task: Write tests for register_builtin_widgets() convenience function
 - [ ] Task: Implement register_builtin_widgets() for all existing widgets
-- [ ] Task: Write tests for user stylesheet loading and merging with defaults
-- [ ] Task: Implement StyleManager::load_user_stylesheet() with proper specificity (is_user_css = 1)
-- [ ] Task: Write tests for stylesheet merge order (defaults first, then user CSS)
-- [ ] Task: Implement merged stylesheet construction in StyleManager::new() or builder
-- [ ] Task: Write tests for theme_version tracking
-- [ ] Task: Implement theme_version() and version increment on changes
+- [x] Task: Write tests for user stylesheet loading and merging with defaults
+- [x] Task: Implement StyleManager::load_user_stylesheet() with proper specificity (is_user_css = 1)
+- [x] Task: Write tests for stylesheet merge order (defaults first, then user CSS)
+- [x] Task: Implement merged stylesheet construction in StyleManager::new() or builder
+- [x] Task: Write tests for theme_version tracking [63a3439]
+- [x] Task: Implement theme_version() and version increment on changes [63a3439]
 
 ### 3.2 Widget Trait Extensions
-- [ ] Task: Write tests for Widget::DEFAULT_CSS default implementation
-- [ ] Task: Add DEFAULT_CSS constant to Widget trait with empty default
-- [ ] Task: Write tests for Widget::pseudo_classes() default implementation
-- [ ] Task: Add pseudo_classes() method to Widget trait with empty default
-- [ ] Task: Write tests for Widget::widget_meta() construction
-- [ ] Task: Add widget_meta() method to Widget trait with default implementation
+- [x] Task: Write tests for Widget::DEFAULT_CSS default implementation [b96a59b]
+- [x] Task: Add DEFAULT_CSS constant to Widget trait with empty default [b96a59b]
+- [x] Task: Write tests for Widget::pseudo_classes() default implementation [b96a59b]
+- [x] Task: Add pseudo_classes() method to Widget trait with empty default [b96a59b]
+- [x] Task: Write tests for Widget::widget_meta() construction [b96a59b]
+- [x] Task: Add widget_meta() method to Widget trait with default implementation [b96a59b]
 
 ### 3.3 ComputedStyle Adapter
 - [ ] Task: Write tests for ComputedStyle::to_ratatui_style() color conversion
@@ -51,25 +51,25 @@
 - [ ] Task: Write comprehensive to_ratatui_style() integration tests
 
 ### 3.4 Style Computation Pipeline
-- [ ] Task: Write tests for get_style() using compute_style_resolved()
-- [ ] Task: Implement StyleManager::get_style() with proper resolution order
+- [x] Task: Write tests for get_style() using compute_style_resolved()
+- [x] Task: Implement StyleManager::get_style() with proper resolution order
 - [ ] Task: Write tests for ancestor chain construction (root→parent order)
 - [ ] Task: Implement ancestor chain building during render traversal
-- [ ] Task: Write tests for animated value overlay application
-- [ ] Task: Implement animated value overlay in get_style()
+- [x] Task: Write tests for animated value overlay application
+- [x] Task: Implement animated value overlay in get_style()
 
 ### 3.5 Style Caching
-- [ ] Task: Define ancestor hash inputs (widget_type, id, classes, pseudo_classes)
-- [ ] Task: Write tests for ancestor hash determinism with same inputs
-- [ ] Task: Implement ancestor_chain_hash() function with stable ordering
-- [ ] Task: Write tests for style cache hit/miss behavior
-- [ ] Task: Implement StyleCacheEntry with ancestor_hash and theme_version
-- [ ] Task: Write tests for cache invalidation on class change
-- [ ] Task: Implement invalidate_widget() for single widget invalidation
-- [ ] Task: Write tests for cache invalidation on theme switch
-- [ ] Task: Implement invalidate_all() for global invalidation
-- [ ] Task: Write tests for ancestor change invalidation
-- [ ] Task: Implement ancestor-aware cache invalidation
+- [x] Task: Define ancestor hash inputs (widget_type, id, classes, pseudo_classes) [63a3439]
+- [x] Task: Write tests for ancestor hash determinism with same inputs [63a3439]
+- [x] Task: Implement ancestor_chain_hash() function with stable ordering [63a3439]
+- [x] Task: Write tests for style cache hit/miss behavior [63a3439]
+- [x] Task: Implement StyleCacheEntry with ancestor_hash and theme_version [63a3439]
+- [x] Task: Write tests for cache invalidation on class change [63a3439]
+- [x] Task: Implement invalidate_widget() for single widget invalidation [63a3439]
+- [x] Task: Write tests for cache invalidation on theme switch [63a3439]
+- [x] Task: Implement invalidate_all() for global invalidation [63a3439]
+- [x] Task: Write tests for ancestor change invalidation [63a3439]
+- [x] Task: Implement ancestor-aware cache invalidation [63a3439]
 
 ### 3.6 RenderContext
 - [ ] Task: Write tests for RenderContext construction
