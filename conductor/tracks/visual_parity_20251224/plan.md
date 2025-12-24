@@ -208,7 +208,7 @@
 - [x] Task: Write snapshot tests for Button default and variants (default/primary/warning)
 - [x] Task: Update Button rendering to use new border/tint/align features
 - [x] Task: Write snapshot tests for Label/Input/Digits using DEFAULT_CSS
-- [ ] Task: Update Label/Input/Digits to use content-align, padding, text-opacity
+- [x] Task: Update Label/Input/Digits to use content-align, padding, text-opacity
 - [x] Task: Update DEFAULT_CSS selectors to match Python (including pseudo-classes)
 - [ ] Task: Conductor - User Manual Verification "Widget Parity Complete" (Protocol in workflow.md)
 
@@ -226,6 +226,37 @@
   - Uses `content_align_horizontal` for horizontal text alignment
   - Uses `content_align_vertical` for vertical text positioning
   - Uses `line_pad` for horizontal padding on label
+
+**Review Fixes (Phase 4):**
+- Added Button hover state tracking:
+  - `hovered` field in Button struct
+  - `is_hovered()`/`set_hovered()` methods for mouse handling
+  - `pseudo_classes()` now includes "hover" when hovered
+  - `:hover` rules in CSS will now activate at runtime
+- Fixed Button tint application:
+  - Background fill now uses `ratatui_style.bg` (tint already applied)
+  - Previously used raw `computed_style.background` (no tint)
+  - `:active` tint effect now properly dims the button background
+
+**Label/Input/Digits CSS Updates (Phase 4):**
+- Label:
+  - Added `render_label_with_computed()` method for CSS-driven rendering
+  - `render_with_context()` now applies content-align (horizontal and vertical)
+  - Applies line-pad for horizontal padding around text
+  - Uses `to_ratatui_style()` for text-opacity/tint application
+  - Fills background area when specified in CSS
+- Input:
+  - Updated DEFAULT_CSS to use pseudo-class selectors (`:focus`, `:disabled`)
+  - Added `content-align: left middle` and `line-pad: 1` to DEFAULT_CSS
+  - Uses `text-opacity: 0.6` for disabled state (instead of `opacity`)
+  - Added `render_input_with_computed()` for CSS-driven rendering
+  - Applies line-pad to all text states (placeholder, value, cursor)
+- Digits:
+  - Added `render_with_context()` method for CSS-aware rendering
+  - Added `render_digits_with_computed()` with content-align support
+  - Added `default_css()` with `content-align: center middle`
+  - Added `classes()` method to Widget trait implementation
+  - Applies horizontal and vertical alignment to position content
 
 ## Phase 5: Example Parity
 - [ ] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
