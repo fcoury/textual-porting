@@ -110,13 +110,19 @@ pub enum Color {
 ```rust
 impl From<&RgbaColor> for ratatui::style::Color {
     fn from(color: &RgbaColor) -> Self {
-        // 1. Check for ANSI named color
+        // 1. Check for ANSI named color.
+        // RgbaColor::ansi stores names with the "ansi_" prefix (e.g., "ansi_red").
         if let Some(ansi_name) = &color.ansi {
             match ansi_name.as_str() {
-                "black" => return ratatui::style::Color::Black,
-                "red" => return ratatui::style::Color::Red,
-                "green" => return ratatui::style::Color::Green,
-                // ... etc
+                "ansi_default" => return ratatui::style::Color::Reset,
+                "ansi_black" => return ratatui::style::Color::Black,
+                "ansi_red" => return ratatui::style::Color::Red,
+                "ansi_green" => return ratatui::style::Color::Green,
+                "ansi_yellow" => return ratatui::style::Color::Yellow,
+                "ansi_blue" => return ratatui::style::Color::Blue,
+                "ansi_magenta" => return ratatui::style::Color::Magenta,
+                "ansi_cyan" => return ratatui::style::Color::Cyan,
+                "ansi_white" => return ratatui::style::Color::White,
                 _ => {}
             }
         }

@@ -29,11 +29,13 @@ Every widget class can define a `DEFAULT_CSS` class variable containing TCSS rul
 | CSS Specificity | Lower than app CSS | App CSS always wins over DEFAULT_CSS |
 
 ### Specificity Hierarchy
-1. External CSS file (highest)
-2. App's `CSS` class variable
+1. App's `CSS` class variable (highest)
+2. External CSS files (`CSS_PATH`)
 3. Widget's `DEFAULT_CSS` (lowest)
 
-This matches our spec's `is_user_css` flag approach.
+This matches Textual's load order in `App._process_messages`: it reads `CSS_PATH`,
+then adds widget DEFAULT_CSS, then adds App `CSS`, so later sources override earlier
+ones. This aligns with our `is_user_css` flag approach.
 
 ## Style Attachment to DOMNode
 

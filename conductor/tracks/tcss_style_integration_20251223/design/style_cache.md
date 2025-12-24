@@ -10,10 +10,10 @@ The style cache stores computed styles to avoid recomputation on every frame. It
 /// Style cache for computed widget styles.
 pub struct StyleCache {
     /// Cached styles by widget ID.
-    entries: HashMap<WidgetId, StyleCacheEntry>,
+    entries: RefCell<HashMap<WidgetId, StyleCacheEntry>>,
 
     /// Cache statistics for debugging/optimization.
-    stats: CacheStats,
+    stats: RefCell<CacheStats>,
 }
 
 /// A single cache entry.
@@ -32,6 +32,10 @@ pub struct StyleCacheEntry {
     /// Hash of the widget's own styling inputs.
     /// (type_name, id, classes, pseudo_classes)
     widget_hash: u64,
+
+    /// Hash of the parent background used for auto colors.
+    /// Only relevant when computed style contains auto colors.
+    parent_bg_hash: u64,
 }
 
 /// Cache statistics for monitoring.
@@ -46,17 +50,13 @@ pub struct CacheStats {
 }
 ```
 
+Note: `RefCell` enables interior mutability so `StyleManager::get_style(&self)`
+can update cache stats without requiring a mutable borrow of the manager.
+
 ## Cache Key
 
-The primary cache key is `WidgetId`. This assumes:
-1. Each widget has a unique, stable ID
-2. The same widget instance always has the same ID
-3. IDs are not reused for different widgets
-
-```rust
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct WidgetId(pub usize);
-```
+The primary cache key is `WidgetId` (a slotmap key created via `new_key_type!`).
+It is obtained from the `WidgetRegistry` when a widget is registered.
 
 ## Cache Validation
 
@@ -64,6 +64,7 @@ A cached entry is valid if ALL of the following match:
 1. **Theme version** matches current `style_manager.theme_version()`
 2. **Ancestor hash** matches current ancestor chain
 3. **Widget hash** matches current widget state
+4. **Parent background hash** matches if auto colors are present
 
 ### Widget Hash Computation
 
@@ -131,6 +132,27 @@ fn compute_ancestor_hash(ancestors: &[&WidgetMeta]) -> u64 {
 }
 ```
 
+### Parent Background Hash
+
+Auto colors depend on the actual parent background color, so cache validation
+must include it when `ComputedStyle::has_auto_colors()` is true.
+
+```rust
+fn hash_color(color: &Color) -> u64 {
+    use std::hash::{Hash, Hasher};
+    use std::collections::hash_map::DefaultHasher;
+
+    let mut hasher = DefaultHasher::new();
+    color.r.hash(&mut hasher);
+    color.g.hash(&mut hasher);
+    color.b.hash(&mut hasher);
+    color.a.to_bits().hash(&mut hasher);
+    color.ansi.hash(&mut hasher);
+    color.auto.hash(&mut hasher);
+    hasher.finish()
+}
+```
+
 ## Cache Operations
 
 ### Get (with validation)
@@ -139,25 +161,30 @@ fn compute_ancestor_hash(ancestors: &[&WidgetMeta]) -> u64 {
 impl StyleCache {
     /// Get a cached style if valid, otherwise return None.
     pub fn get(
-        &mut self,
+        &self,
         widget_id: WidgetId,
         widget: &WidgetMeta,
         ancestors: &[&WidgetMeta],
         theme_version: u64,
-    ) -> Option<&ComputedStyle> {
-        let entry = self.entries.get(&widget_id)?;
+        parent_background: &Color,
+    ) -> Option<ComputedStyle> {
+        let entries = self.entries.borrow();
+        let entry = entries.get(&widget_id)?;
+
+        let bg_hash = hash_color(parent_background);
 
         // Validate entry
         let valid = entry.theme_version == theme_version
             && entry.widget_hash == compute_widget_hash(widget)
-            && entry.ancestor_hash == compute_ancestor_hash(ancestors);
+            && entry.ancestor_hash == compute_ancestor_hash(ancestors)
+            && (!entry.computed.has_auto_colors() || entry.parent_bg_hash == bg_hash);
 
         if valid {
-            self.stats.hits += 1;
-            Some(&entry.computed)
+            self.stats.borrow_mut().hits += 1;
+            Some(entry.computed.clone())
         } else {
             // Entry exists but is stale
-            self.stats.misses += 1;
+            self.stats.borrow_mut().misses += 1;
             None
         }
     }
@@ -170,11 +197,12 @@ impl StyleCache {
 impl StyleCache {
     /// Insert a computed style into the cache.
     pub fn insert(
-        &mut self,
+        &self,
         widget_id: WidgetId,
         widget: &WidgetMeta,
         ancestors: &[&WidgetMeta],
         theme_version: u64,
+        parent_background: &Color,
         computed: ComputedStyle,
     ) {
         let entry = StyleCacheEntry {
@@ -182,9 +210,10 @@ impl StyleCache {
             ancestor_hash: compute_ancestor_hash(ancestors),
             theme_version,
             widget_hash: compute_widget_hash(widget),
+            parent_bg_hash: hash_color(parent_background),
         };
 
-        self.entries.insert(widget_id, entry);
+        self.entries.borrow_mut().insert(widget_id, entry);
     }
 }
 ```
@@ -194,9 +223,9 @@ impl StyleCache {
 ```rust
 impl StyleCache {
     /// Invalidate a single widget's cached style.
-    pub fn invalidate(&mut self, widget_id: WidgetId) {
-        if self.entries.remove(&widget_id).is_some() {
-            self.stats.invalidations += 1;
+    pub fn invalidate(&self, widget_id: WidgetId) {
+        if self.entries.borrow_mut().remove(&widget_id).is_some() {
+            self.stats.borrow_mut().invalidations += 1;
         }
     }
 
@@ -206,15 +235,15 @@ impl StyleCache {
     /// - Theme switch
     /// - Hot reload
     /// - Global state change
-    pub fn invalidate_all(&mut self) {
-        let count = self.entries.len();
-        self.entries.clear();
-        self.stats.invalidations += count as u64;
+    pub fn invalidate_all(&self) {
+        let count = self.entries.borrow().len();
+        self.entries.borrow_mut().clear();
+        self.stats.borrow_mut().invalidations += count as u64;
     }
 
     /// Remove entries for unmounted widgets.
-    pub fn remove(&mut self, widget_id: WidgetId) {
-        self.entries.remove(&widget_id);
+    pub fn remove(&self, widget_id: WidgetId) {
+        self.entries.borrow_mut().remove(&widget_id);
     }
 }
 ```
@@ -271,7 +300,7 @@ impl StyleCache {
 ```rust
 impl StyleManager {
     pub fn get_style(
-        &mut self,
+        &self,
         widget_id: WidgetId,
         widget: &WidgetMeta,
         ancestors: &[&WidgetMeta],
@@ -283,9 +312,10 @@ impl StyleManager {
             widget,
             ancestors,
             self.theme_version,
+            parent_background,
         ) {
             // Apply animated values on top of cached style
-            return self.apply_animations(widget_id, cached.clone());
+            return self.apply_animations(widget_id, cached);
         }
 
         // Cache miss: compute fresh
@@ -302,6 +332,7 @@ impl StyleManager {
             widget,
             ancestors,
             self.theme_version,
+            parent_background,
             style.clone(),
         );
 
@@ -400,11 +431,13 @@ mod tests {
         let mut cache = StyleCache::new();
         let meta = WidgetMeta::new("Button");
         let ancestors: &[&WidgetMeta] = &[];
+        let mut registry = WidgetRegistry::new();
+        let widget_id = registry.add(Button::new("Test"));
 
-        cache.insert(WidgetId(1), &meta, ancestors, 1, ComputedStyle::default());
+        cache.insert(widget_id, &meta, ancestors, 1, &Color::default(), ComputedStyle::default());
 
-        assert!(cache.get(WidgetId(1), &meta, ancestors, 1).is_some());
-        assert_eq!(cache.stats.hits, 1);
+        assert!(cache.get(widget_id, &meta, ancestors, 1, &Color::default()).is_some());
+        assert_eq!(cache.stats.borrow().hits, 1);
     }
 
     #[test]
@@ -412,12 +445,14 @@ mod tests {
         let mut cache = StyleCache::new();
         let meta = WidgetMeta::new("Button");
         let ancestors: &[&WidgetMeta] = &[];
+        let mut registry = WidgetRegistry::new();
+        let widget_id = registry.add(Button::new("Test"));
 
-        cache.insert(WidgetId(1), &meta, ancestors, 1, ComputedStyle::default());
+        cache.insert(widget_id, &meta, ancestors, 1, &Color::default(), ComputedStyle::default());
 
         // Different theme version
-        assert!(cache.get(WidgetId(1), &meta, ancestors, 2).is_none());
-        assert_eq!(cache.stats.misses, 1);
+        assert!(cache.get(widget_id, &meta, ancestors, 2, &Color::default()).is_none());
+        assert_eq!(cache.stats.borrow().misses, 1);
     }
 
     #[test]
@@ -426,11 +461,13 @@ mod tests {
         let meta1 = WidgetMeta::new("Button");
         let meta2 = WidgetMeta::new("Button").with_class("primary");
         let ancestors: &[&WidgetMeta] = &[];
+        let mut registry = WidgetRegistry::new();
+        let widget_id = registry.add(Button::new("Test"));
 
-        cache.insert(WidgetId(1), &meta1, ancestors, 1, ComputedStyle::default());
+        cache.insert(widget_id, &meta1, ancestors, 1, &Color::default(), ComputedStyle::default());
 
         // Widget has new class
-        assert!(cache.get(WidgetId(1), &meta2, ancestors, 1).is_none());
+        assert!(cache.get(widget_id, &meta2, ancestors, 1, &Color::default()).is_none());
     }
 
     #[test]
@@ -439,11 +476,13 @@ mod tests {
         let meta = WidgetMeta::new("Button");
         let parent1 = WidgetMeta::new("Container");
         let parent2 = WidgetMeta::new("Container").with_class("dark");
+        let mut registry = WidgetRegistry::new();
+        let widget_id = registry.add(Button::new("Test"));
 
-        cache.insert(WidgetId(1), &meta, &[&parent1], 1, ComputedStyle::default());
+        cache.insert(widget_id, &meta, &[&parent1], 1, &Color::default(), ComputedStyle::default());
 
         // Ancestor has new class
-        assert!(cache.get(WidgetId(1), &meta, &[&parent2], 1).is_none());
+        assert!(cache.get(widget_id, &meta, &[&parent2], 1, &Color::default()).is_none());
     }
 
     #[test]
@@ -451,14 +490,17 @@ mod tests {
         let mut cache = StyleCache::new();
         let meta = WidgetMeta::new("Button");
         let ancestors: &[&WidgetMeta] = &[];
+        let mut registry = WidgetRegistry::new();
+        let widget_id1 = registry.add(Button::new("Test"));
+        let widget_id2 = registry.add(Button::new("Other"));
 
-        cache.insert(WidgetId(1), &meta, ancestors, 1, ComputedStyle::default());
-        cache.insert(WidgetId(2), &meta, ancestors, 1, ComputedStyle::default());
+        cache.insert(widget_id1, &meta, ancestors, 1, &Color::default(), ComputedStyle::default());
+        cache.insert(widget_id2, &meta, ancestors, 1, &Color::default(), ComputedStyle::default());
 
         cache.invalidate_all();
 
-        assert!(cache.get(WidgetId(1), &meta, ancestors, 1).is_none());
-        assert!(cache.get(WidgetId(2), &meta, ancestors, 1).is_none());
+        assert!(cache.get(widget_id1, &meta, ancestors, 1, &Color::default()).is_none());
+        assert!(cache.get(widget_id2, &meta, ancestors, 1, &Color::default()).is_none());
     }
 }
 ```

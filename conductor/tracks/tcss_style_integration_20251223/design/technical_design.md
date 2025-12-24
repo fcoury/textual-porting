@@ -39,7 +39,7 @@ This document describes the integration of the existing TCSS styling engine with
 │  ┌────────────────────────────────────▼───────────────────────┐ │
 │  │                      Widgets                                 │ │
 │  │  ┌────────────────────────────────────────────────────────┐ │ │
-│  │  │ fn render_with_context(area, frame, &RenderContext)    │ │ │
+│  │  │ fn render_with_context(id, area, frame, &RenderContext)│ │ │
 │  │  │     let style = context.style_for(self.id, self);      │ │ │
 │  │  │     let ratatui_style = style.to_ratatui_style();      │ │ │
 │  │  │     // render with style...                            │ │ │
@@ -58,6 +58,7 @@ Central coordinator owning all styling concerns.
 - `StyleSheet` - Merged widget defaults + user CSS
 - `ThemeRegistry` - Active theme and switching
 - `Animator` - Transitions and @keyframes
+- `transition_overlays` - ActiveTransition map for non-numeric transitions
 - `HotReloadManager` - File watching (optional)
 - `StyleCache` - Per-widget computed style cache
 
@@ -66,12 +67,15 @@ Central coordinator owning all styling concerns.
 pub fn register_widget_defaults<W: Widget>(&mut self);
 pub fn load_user_stylesheet(&mut self, source: &str) -> Result<(), StyleError>;
 pub fn get_style(&self, widget_id, widget, ancestors, parent_bg) -> ComputedStyle;
-pub fn tick(&mut self, dt: Duration);
+pub fn tick(&mut self, now: Instant);
 pub fn poll_hot_reload(&mut self) -> bool;
 pub fn set_theme(&mut self, name: &str) -> Result<(), ThemeError>;
 pub fn invalidate_widget(&mut self, widget_id: WidgetId);
 pub fn invalidate_all(&mut self);
 ```
+
+**Rule Origin:** StyleSheet entries record whether a rule came from DEFAULT_CSS
+or user CSS so `Specificity.is_user_css` can be injected during matching.
 
 **Design Doc:** [style_manager.md](./style_manager.md)
 
@@ -102,6 +106,10 @@ Per-widget computed style cache with multi-factor invalidation.
 - `theme_version` - Matches current StyleManager version
 - `ancestor_hash` - Hash of ancestor chain styling inputs
 - `widget_hash` - Hash of widget's own styling inputs
+- `parent_bg_hash` - Included when auto colors are present
+
+StyleCache uses interior mutability so `StyleManager::get_style(&self)` can update
+cache stats without requiring a mutable borrow.
 
 **Design Doc:** [style_cache.md](./style_cache.md)
 
@@ -137,7 +145,7 @@ pub trait Widget {
         }
     }
 
-    fn render_with_context(&self, area: Rect, frame: &mut Frame, context: &RenderContext) {
+    fn render_with_context(&self, id: WidgetId, area: Rect, frame: &mut Frame, context: &RenderContext) {
         self.render(area, frame);  // Default: backwards compatible
     }
 }
@@ -150,23 +158,23 @@ pub trait Widget {
    └─► Build WidgetMeta with current pseudo-classes
 
 2. StyleCache::get()
-   ├─► Cache HIT: return cached ComputedStyle
+   ├─► Cache HIT: return cached ComputedStyle (validated against parent background when auto colors are used)
    └─► Cache MISS: continue to step 3
 
 3. compute_style_resolved()
    ├─► Match selectors against widget + ancestors
-   ├─► Apply cascade (defaults → user CSS → !important)
+   ├─► Apply cascade (origin: default vs user, then !important, then specificity)
    ├─► Resolve theme variables ($primary, $background, etc.)
    └─► Resolve auto colors against parent background
 
 4. StyleCache::insert()
    └─► Store computed style with validation factors
 
-5. Animator::values_for()
-   └─► Get active animation values for widget
+5. Animator::get_value()
+   └─► Get active numeric animation values for widget properties
 
 6. apply_animations()
-   └─► Overlay animated values on computed style
+   └─► Overlay numeric animations + transition overlays on computed style
 
 7. Return final ComputedStyle
 ```
@@ -193,6 +201,11 @@ pub trait ManagedWidgetApp: App {
 
     fn style_manager(&self) -> &StyleManager;
     fn style_manager_mut(&mut self) -> &mut StyleManager;
+
+    /// Render with style context (default delegates to App::view).
+    fn view_with_context(&self, frame: &mut Frame, _context: &RenderContext) {
+        self.view(frame);
+    }
 }
 ```
 
@@ -203,11 +216,10 @@ pub fn run_managed<A>(mut app: A) -> Result<(), TerminalError> {
     // ... setup ...
 
     loop {
-        let dt = last_frame.elapsed();
-        last_frame = Instant::now();
+        let now = Instant::now();
 
         // NEW: Tick animator
-        app.style_manager_mut().tick(dt);
+        app.style_manager_mut().tick(now);
 
         // NEW: Poll hot reload
         if app.style_manager_mut().poll_hot_reload() {
@@ -357,6 +369,7 @@ All core components exist in `style.rs`:
 ### Modified Files
 - `src/widget.rs` - Add DEFAULT_CSS, pseudo_classes(), widget_meta(), render_with_context()
 - `src/style.rs` - Add pseudo_classes to WidgetMeta, add to_ratatui_style()
+- `src/style.rs` - Extend stylesheet rules with origin metadata (default vs user)
 - `src/app.rs` - Add style_manager to ManagedWidgetApp, update run_managed()
 - `src/widgets/*.rs` - Add DEFAULT_CSS and render_with_context() to each widget
 

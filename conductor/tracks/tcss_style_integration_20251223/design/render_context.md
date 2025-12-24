@@ -24,6 +24,9 @@ pub struct RenderContext<'a> {
 }
 ```
 
+Note: `StyleManager::get_style(&self)` uses interior mutability for caching,
+so RenderContext can hold an immutable reference.
+
 ## Public API
 
 ### Construction
@@ -58,6 +61,7 @@ impl<'a> RenderContext<'a> {
     ///
     /// This is the primary method widgets use to get their TCSS styles.
     pub fn style_for(&self, widget_id: WidgetId, widget: &impl Widget) -> ComputedStyle {
+        // widget_id must be the registry WidgetId (not the CSS id string)
         let meta = widget.widget_meta();
         let ancestor_refs: Vec<&WidgetMeta> = self.ancestors.iter().collect();
 
@@ -151,16 +155,16 @@ run_managed() loop
     ├─► Create RenderContext (root)
     │
     └─► terminal.draw(|frame| {
-            app.view(frame, &context)  // Pass context to app
+            app.view_with_context(frame, &context)  // Pass context to app
         })
             │
-            └─► Container::render(frame, &context)
+            └─► Container::render_with_context(id, area, frame, &context)
                     │
                     ├─► let style = context.style_for(id, self);
                     ├─► let child_ctx = context.child_context(self, &style);
                     │
                     └─► for child in children {
-                            child.render(frame, &child_ctx);
+                            child.render_with_context(child_id, child_area, frame, &child_ctx);
                         }
 ```
 
@@ -168,9 +172,9 @@ run_managed() loop
 
 ```rust
 impl Widget for Container {
-    fn render(&self, area: Rect, frame: &mut Frame, context: &RenderContext) {
+    fn render_with_context(&self, id: WidgetId, area: Rect, frame: &mut Frame, context: &RenderContext) {
         // 1. Get own computed style
-        let style = context.style_for(self.id, self);
+        let style = context.style_for(id, self);
         let ratatui_style = style.to_ratatui_style();
 
         // 2. Render self with computed style
@@ -186,7 +190,7 @@ impl Widget for Container {
         let inner = block.inner(area);
         for (child_id, child) in &self.children {
             if let Some(child_area) = self.layout_cache.get(child_id) {
-                child.render(*child_area, frame, &child_ctx);
+                child.render_with_context(*child_id, *child_area, frame, &child_ctx);
             }
         }
     }
@@ -205,7 +209,7 @@ pub trait Widget: Any + std::fmt::Debug {
     fn render(&self, area: Rect, frame: &mut Frame);
 
     // NEW: Render with style context
-    fn render_with_context(&self, area: Rect, frame: &mut Frame, context: &RenderContext) {
+    fn render_with_context(&self, id: WidgetId, area: Rect, frame: &mut Frame, context: &RenderContext) {
         // Default: delegate to existing render() for backwards compatibility
         self.render(area, frame);
     }
@@ -218,7 +222,7 @@ The render pipeline calls `render_with_context()`. Widgets that want TCSS stylin
 
 ```rust
 pub trait Widget: Any + std::fmt::Debug {
-    fn render(&self, area: Rect, frame: &mut Frame, context: Option<&RenderContext>) {
+    fn render(&self, id: WidgetId, area: Rect, frame: &mut Frame, context: Option<&RenderContext>) {
         // Widgets check for context and use it if available
     }
 }
@@ -284,10 +288,12 @@ mod tests {
         let mut sm = StyleManager::new();
         sm.load_user_stylesheet("Button { color: red; }").unwrap();
 
+        let mut registry = WidgetRegistry::new();
         let ctx = RenderContext::new(&sm);
         let button = Button::new("Test");
+        let id = registry.add(button);
 
-        let style = ctx.style_for(WidgetId(1), &button);
+        let style = ctx.style_for(id, registry.get(id).unwrap());
         assert_eq!(style.color.unwrap().r, 255);
     }
 
@@ -338,11 +344,10 @@ where
     // ... existing setup ...
 
     loop {
-        let dt = last_frame.elapsed();
-        last_frame = Instant::now();
+        let now = Instant::now();
 
         // Tick animator
-        app.style_manager_mut().tick(dt);
+        app.style_manager_mut().tick(now);
 
         // Poll hot reload
         if app.style_manager_mut().poll_hot_reload() {
@@ -363,3 +368,6 @@ where
     }
 }
 ```
+
+`ManagedWidgetApp` should provide a default `view_with_context` implementation
+that delegates to `App::view`, so existing apps remain compatible.

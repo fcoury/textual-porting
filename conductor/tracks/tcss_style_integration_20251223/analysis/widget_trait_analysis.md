@@ -73,13 +73,18 @@ fn pseudo_classes(&self) -> HashSet<String> { HashSet::new() }
 - Default returns empty set
 
 ### 4. WidgetMeta Construction
+**Note:** `style.rs` already defines `WidgetMeta` with fields:
+`type_name: String`, `classes: Vec<String>`, and `id: Option<String>`.
+For TCSS integration we will extend it to include `pseudo_classes` (and keep
+`type_name` unless we decide to rename for clarity).
+
 **Need to add:**
 ```rust
 fn widget_meta(&self) -> WidgetMeta {
     WidgetMeta {
+        type_name: self.widget_type_name().to_string(),
+        classes: self.classes().to_vec(),
         id: self.id().map(|s| s.to_string()),
-        classes: self.classes().iter().cloned().collect(),
-        widget_type: self.widget_type_name().to_string(),
         pseudo_classes: self.pseudo_classes(),
     }
 }
@@ -138,9 +143,9 @@ trait Widget: Any + std::fmt::Debug {
     // NEW: Construct WidgetMeta for style computation
     fn widget_meta(&self) -> crate::style::WidgetMeta {
         crate::style::WidgetMeta {
+            type_name: self.widget_type_name().to_string(),
+            classes: self.classes().to_vec(),
             id: self.id().map(|s| s.to_string()),
-            classes: self.classes().iter().cloned().collect(),
-            widget_type: self.widget_type_name().to_string(),
             pseudo_classes: self.pseudo_classes(),
         }
     }

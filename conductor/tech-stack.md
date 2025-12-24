@@ -16,6 +16,12 @@
 - **Logging/Diagnostics:** `tracing` (structured diagnostics)
 - **Testing:** `insta` (snapshot testing), `criterion` (benchmarking)
 
+## Text Processing
+- **Unicode Width:** `unicode-width` (correct cell-width measurement for box-drawing characters, emoji, CJK)
+  - *Transitive dependency via ratatui* - no additional download required
+  - Required for content-align, line-pad, and text layout parity with Python Textual
+  - Access via direct dependency or ratatui re-export when implementing render-time alignment
+
 ## Build & Package Management
 - **Build System:** Cargo
 - **Package Manager:** Cargo (crates.io)

@@ -57,20 +57,21 @@ The existing `AnimationKey` identifies an animation:
 // From style.rs
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct AnimationKey {
-    /// Widget identifier.
-    pub widget_id: String,
+    /// Target object ID.
+    pub object_id: u64,
     /// Property being animated.
     pub property: String,
 }
 ```
 
-For integration with `WidgetId`:
+For integration with `WidgetId`, derive a stable `u64` object_id from the slotmap
+key data (e.g., `widget_id.data().as_ffi()`), and use that with `AnimationKey::new`.
 
 ```rust
 impl AnimationKey {
-    pub fn new(widget_id: WidgetId, property: impl Into<String>) -> Self {
+    pub fn new(object_id: u64, property: impl Into<String>) -> Self {
         Self {
-            widget_id: widget_id.0.to_string(),
+            object_id,
             property: property.into(),
         }
     }
@@ -79,7 +80,10 @@ impl AnimationKey {
 
 ## Animatable Properties
 
-Not all CSS properties can be animated. The following are supported:
+Not all CSS properties can be animated. The authoritative list is defined by
+`is_property_animatable()` / `ANIMATABLE_PROPERTIES` in `style.rs`.
+
+Common categories:
 
 | Property | Animation Type | Notes |
 |----------|---------------|-------|
@@ -93,24 +97,8 @@ Not all CSS properties can be animated. The following are supported:
 
 ### Color Animation
 
-Colors are interpolated component-wise:
-
-```rust
-impl Animatable for RgbaColor {
-    fn lerp(&self, other: &Self, t: f64) -> Self {
-        RgbaColor::rgba(
-            lerp_u8(self.r, other.r, t),
-            lerp_u8(self.g, other.g, t),
-            lerp_u8(self.b, other.b, t),
-            lerp_f32(self.a, other.a, t as f32),
-        )
-    }
-}
-
-fn lerp_u8(a: u8, b: u8, t: f64) -> u8 {
-    (a as f64 + (b as f64 - a as f64) * t).round() as u8
-}
-```
+Colors are interpolated via the existing `Animatable for Color` implementation
+in `style.rs`, which blends RGB (+ alpha) and snaps ANSI/auto colors at 50%.
 
 ## Animator Integration
 
@@ -118,31 +106,8 @@ fn lerp_u8(a: u8, b: u8, t: f64) -> u8 {
 
 ```rust
 impl Animator {
-    /// Get all current animation values for a widget.
-    pub fn values_for(&self, widget_id: WidgetId) -> Vec<(String, AnimatedValue)> {
-        let prefix = widget_id.0.to_string();
-
-        self.animations
-            .iter()
-            .filter(|(key, _)| key.widget_id == prefix)
-            .map(|(key, state)| {
-                let value = AnimatedValue::from_state(state);
-                (key.property.clone(), value)
-            })
-            .collect()
-    }
-
     /// Get a specific animated value if active.
-    pub fn get_value(&self, widget_id: WidgetId, property: &str) -> Option<f64> {
-        let key = AnimationKey::new(widget_id, property);
-        self.animations.get(&key).map(|state| state.current_value())
-    }
-}
-
-/// Typed animated value.
-pub enum AnimatedValue {
-    Number(f64),
-    Color(RgbaColor),
+    pub fn get_value(&self, key: &AnimationKey) -> Option<f64>;
 }
 ```
 
@@ -151,29 +116,15 @@ pub enum AnimatedValue {
 ```rust
 impl StyleManager {
     fn apply_animations(&self, widget_id: WidgetId, mut style: ComputedStyle) -> ComputedStyle {
-        for (property, value) in self.animator.values_for(widget_id) {
-            match property.as_str() {
-                "opacity" => {
-                    if let AnimatedValue::Number(v) = value {
-                        style.opacity = Some(v);
-                    }
-                }
-                "color" => {
-                    if let AnimatedValue::Color(c) = value {
-                        style.color = Some(c);
-                    }
-                }
-                "background" => {
-                    if let AnimatedValue::Color(c) = value {
-                        style.background = Some(c);
-                    }
-                }
-                // Future: width, height, margin, padding
-                _ => {
-                    // Unknown property - ignore
-                }
-            }
+    // Requires `use slotmap::Key` for data()/as_ffi().
+    let object_id = widget_id.data().as_ffi();
+
+        if let Some(opacity) = self.animator.get_value(&AnimationKey::new(object_id, "opacity")) {
+            style.opacity = Some(opacity);
         }
+
+        // Non-numeric properties (color, spacing, etc.) use the transition overlay
+        // path (ActiveTransition + interpolate_transition) instead of Animator.
         style
     }
 }
@@ -205,7 +156,8 @@ impl StyleManager {
         duration: Duration,
         easing: EasingFunction,
     ) {
-        let key = AnimationKey::new(widget_id, property);
+        let object_id = widget_id.data().as_ffi();
+        let key = AnimationKey::new(object_id, property);
         self.animator.animate(key, start, end, duration, easing, Duration::ZERO);
     }
 }
@@ -217,12 +169,13 @@ Each frame, the animator is ticked:
 
 ```rust
 // In run_managed() loop
-let dt = last_frame.elapsed();
-app.style_manager_mut().tick(dt);
+let now = Instant::now();
+app.style_manager_mut().tick(now);
 
 impl StyleManager {
-    pub fn tick(&mut self, dt: Duration) {
-        self.animator.tick(dt);
+    pub fn tick(&mut self, now: Instant) {
+        self.animator.tick(now);
+        self.tick_transition_overlays();
     }
 }
 ```
@@ -233,16 +186,22 @@ When an animation completes:
 1. The final value is held until explicitly cleared
 2. Or the animation is removed from the Animator
 
+For non-numeric transitions stored as `ActiveTransition`, `StyleManager` should
+tick and remove completed overlays during `tick_transition_overlays()`.
+
+```rust
+fn tick_transition_overlays(&mut self) {
+    self.transition_overlays.retain(|_, t| {
+        let _events = t.tick();
+        !t.is_complete()
+    });
+}
+```
+
 ```rust
 impl Animator {
-    pub fn tick(&mut self, dt: Duration) {
-        for (key, state) in &mut self.animations {
-            state.advance(dt);
-        }
-
-        // Remove completed animations
-        self.animations.retain(|_, state| !state.completed || state.fill_mode.holds_end());
-    }
+    /// Tick animations and return any keys that completed.
+    pub fn tick(&mut self, now: Instant) -> Vec<AnimationKey>;
 }
 ```
 
@@ -262,8 +221,9 @@ Button:hover {
 
 When hover state changes:
 1. Style recomputes with new pseudo-class
-2. If `opacity` differs from current and has a transition, start animation
-3. Animator interpolates from current to target
+2. Diff old/new style values for animatable properties
+3. If a transition is defined, start a numeric animation or register an
+   ActiveTransition overlay for non-numeric values
 
 ### Transition Detection
 
@@ -275,22 +235,33 @@ impl StyleManager {
         old_style: &ComputedStyle,
         new_style: &ComputedStyle,
     ) {
-        // Check if new_style has transition properties
-        if let Some(transition) = &new_style.transition {
-            for prop in transition.properties() {
-                let old_val = old_style.get_property(prop);
-                let new_val = new_style.get_property(prop);
+        let controller = TransitionController::from_transitions(
+            new_style
+                .transition
+                .clone()
+                .unwrap_or_else(TransitionSet::new),
+        );
 
-                if old_val != new_val {
-                    // Start transition animation
-                    self.animate(
-                        widget_id,
-                        prop,
-                        old_val.to_f64(),
-                        new_val.to_f64(),
-                        transition.duration,
-                        transition.timing,
-                    );
+        for (prop, old_val, new_val) in diff_style_values(old_style, new_style) {
+            if let Some(params) = controller.get_transition_params(&prop, &old_val, &new_val) {
+                let pending = PendingTransition::new(
+                    widget_id.data().as_ffi(),
+                    prop.clone(),
+                    old_val.clone(),
+                    new_val.clone(),
+                    params,
+                );
+
+                // Numeric values go through Animator; others use ActiveTransition overlay
+                if !pending.start(&mut self.animator) {
+                    self.transition_overlays
+                        .insert((widget_id, prop.clone()), ActiveTransition::new(
+                            widget_id.data().as_ffi(),
+                            prop,
+                            old_val,
+                            new_val,
+                            params,
+                        ));
                 }
             }
         }
@@ -320,8 +291,8 @@ impl StyleManager {
             computed
         };
 
-        // ALWAYS apply animations (not cached)
-        self.apply_animations(widget_id, base)
+// ALWAYS apply animations/transition overlays (not cached)
+self.apply_animations(widget_id, base)
     }
 }
 ```
@@ -333,7 +304,7 @@ This ensures animations appear immediately, even when the base style is cached.
 ### Per-Frame Overhead
 
 - `tick()`: O(A) where A = active animations
-- `values_for()`: O(A) filter + collect
+- `get_value()`: O(1) per animated numeric property
 - `apply_animations()`: O(P) where P = animated properties per widget
 
 For typical apps with <100 concurrent animations, this is negligible.
@@ -342,22 +313,23 @@ For typical apps with <100 concurrent animations, this is negligible.
 
 ```rust
 impl StyleManager {
-    pub fn get_style(&mut self, ...) -> ComputedStyle {
+    pub fn get_style(&self, ...) -> ComputedStyle {
         let base = /* cache or compute */;
 
-        // Fast path: no animations for this widget
-        if !self.animator.has_animations(widget_id) {
+        // Fast path: no numeric animations and no transition overlays
+        let object_id = widget_id.data().as_ffi();
+        let has_overlay = self
+            .transition_overlays
+            .keys()
+            .any(|(id, _)| *id == widget_id);
+
+        if !self.animator.is_animating(&AnimationKey::new(object_id, "opacity"))
+            && !has_overlay
+        {
             return base;
         }
 
         self.apply_animations(widget_id, base)
-    }
-}
-
-impl Animator {
-    pub fn has_animations(&self, widget_id: WidgetId) -> bool {
-        let prefix = widget_id.0.to_string();
-        self.animations.keys().any(|k| k.widget_id == prefix)
     }
 }
 ```
@@ -370,34 +342,37 @@ fn test_animation_overlay() {
     let mut sm = StyleManager::new();
     sm.load_user_stylesheet("Button { opacity: 1.0; }").unwrap();
 
+    let mut registry = WidgetRegistry::new();
     let meta = WidgetMeta::new("Button");
     let ancestors: &[&WidgetMeta] = &[];
+    let widget_id = registry.add(Button::new("Test"));
 
     // Initial style
-    let style1 = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+    let style1 = sm.get_style(widget_id, &meta, ancestors, &Color::default());
     assert_eq!(style1.opacity, Some(1.0));
 
     // Start animation
-    sm.animate(WidgetId(1), "opacity", 1.0, 0.5, Duration::from_millis(100), EasingFunction::Linear);
+    sm.animate(widget_id, "opacity", 1.0, 0.5, Duration::from_millis(100), EasingFunction::Linear);
 
     // Tick halfway
-    sm.tick(Duration::from_millis(50));
+    sm.tick(Instant::now() + Duration::from_millis(50));
 
     // Style should show animated value
-    let style2 = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+    let style2 = sm.get_style(widget_id, &meta, ancestors, &Color::default());
     assert!((style2.opacity.unwrap() - 0.75).abs() < 0.01);
 }
 
 #[test]
 fn test_animation_completion() {
     let mut sm = StyleManager::new();
-    sm.animate(WidgetId(1), "opacity", 1.0, 0.0, Duration::from_millis(100), EasingFunction::Linear);
+    let mut registry = WidgetRegistry::new();
+    let widget_id = registry.add(Button::new("Test"));
+    sm.animate(widget_id, "opacity", 1.0, 0.0, Duration::from_millis(100), EasingFunction::Linear);
 
     // Tick past completion
-    sm.tick(Duration::from_millis(150));
-
+    sm.tick(Instant::now() + Duration::from_millis(150));
     let meta = WidgetMeta::new("Button");
-    let style = sm.get_style(WidgetId(1), &meta, &[], &Color::default());
+    let style = sm.get_style(widget_id, &meta, &[], &Color::default());
 
     // Animation should have reached target
     assert_eq!(style.opacity, Some(0.0));
@@ -409,18 +384,20 @@ fn test_cached_base_with_animation() {
     sm.load_user_stylesheet("Button { opacity: 1.0; }").unwrap();
     sm.register_widget_defaults::<Button>().unwrap();
 
+    let mut registry = WidgetRegistry::new();
     let meta = WidgetMeta::new("Button");
     let ancestors: &[&WidgetMeta] = &[];
 
     // Warm cache
-    let _ = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+    let widget_id = registry.add(Button::new("Test"));
+    let _ = sm.get_style(widget_id, &meta, ancestors, &Color::default());
 
     // Start animation
-    sm.animate(WidgetId(1), "opacity", 1.0, 0.0, Duration::from_millis(100), EasingFunction::Linear);
-    sm.tick(Duration::from_millis(50));
+    sm.animate(widget_id, "opacity", 1.0, 0.0, Duration::from_millis(100), EasingFunction::Linear);
+    sm.tick(Instant::now() + Duration::from_millis(50));
 
     // Should use cached base + animation overlay
-    let style = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+    let style = sm.get_style(widget_id, &meta, ancestors, &Color::default());
     assert!((style.opacity.unwrap() - 0.5).abs() < 0.01);
 }
 ```

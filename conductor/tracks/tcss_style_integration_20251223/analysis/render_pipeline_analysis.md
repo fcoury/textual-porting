@@ -55,6 +55,7 @@ where
     A: ManagedWidgetApp,
     A::Message: From<Event>,
 {
+    use crate::geometry::Rect;
     let mut terminal_guard = TerminalGuard::new()?;
     let terminal = terminal_guard.terminal();
 
@@ -134,8 +135,8 @@ loop {
         ancestors: vec![],
     };
 
-    // Render with context (needs design decision)
-    terminal.draw(|f| app.view(f))?;  // How to pass context?
+    // Render with context (e.g., pass RenderContext through the view traversal)
+    terminal.draw(|f| app.view(f))?;
 
     // ... handle events ...
 }
@@ -183,10 +184,11 @@ fn render(&self, area: Rect, frame: &mut Frame) {
 }
 ```
 
-**Recommendation: Option B with migration**
-- Add `render_with_context()` to Widget trait with default that delegates to `render()`
-- Update run loop to call `render_with_context()`
-- Widgets migrate incrementally
+**Recommendation: RenderContext-based access (no signature break)**
+- Pass a `RenderContext` through the render traversal (root → children)
+- Widgets that opt in call `context.style_for(self)` during render
+- If needed for ergonomics, add a `render_with_context()` helper that defaults to `render()`
+  (but avoid changing the existing `render()` signature)
 
 ## Timing Considerations
 

@@ -22,7 +22,13 @@ All core components exist in `style.rs`:
 
 ```rust
 pub struct StyleManager {
-    /// Merged stylesheet (widget defaults + user CSS).
+    /// Widget default stylesheet (DEFAULT_CSS from widgets).
+    defaults: StyleSheet,
+
+    /// User stylesheet (inline or file).
+    user: Option<ReloadableStylesheet>,
+
+    /// Effective stylesheet (defaults + user).
     stylesheet: StyleSheet,
 
     /// Active theme and theme switching.
@@ -30,6 +36,9 @@ pub struct StyleManager {
 
     /// Central animator for transitions and @keyframes.
     animator: Animator,
+
+    /// Active transition overlays for non-numeric properties.
+    transition_overlays: HashMap<(WidgetId, String), ActiveTransition>,
 
     /// File watching for .tcss changes (dev mode).
     hot_reload: Option<HotReloadManager>,
@@ -50,7 +59,10 @@ pub struct StyleManager {
 ```rust
 pub struct StyleCache {
     /// Cached styles by widget ID.
-    entries: HashMap<WidgetId, StyleCacheEntry>,
+    entries: RefCell<HashMap<WidgetId, StyleCacheEntry>>,
+
+    /// Cache statistics (hits/misses/invalidations).
+    stats: RefCell<CacheStats>,
 }
 
 pub struct StyleCacheEntry {
@@ -62,6 +74,12 @@ pub struct StyleCacheEntry {
 
     /// Theme version at computation time.
     theme_version: u64,
+
+    /// Hash of the widget's own styling inputs.
+    widget_hash: u64,
+
+    /// Hash of the parent background used for auto colors.
+    parent_bg_hash: u64,
 }
 ```
 
@@ -99,7 +117,7 @@ impl StyleManagerBuilder {
 impl StyleManager {
     /// Register a widget type's DEFAULT_CSS.
     ///
-    /// Parses the CSS and merges rules with is_user_css = 0 (lowest specificity).
+    /// Parses the CSS and registers rules as Default origin (lowest priority).
     pub fn register_widget_defaults<W: Widget>(&mut self) -> Result<(), StyleError>;
 
     /// Register all built-in widgets at once.
@@ -113,13 +131,16 @@ impl StyleManager {
 impl StyleManager {
     /// Load user stylesheet from source string.
     ///
-    /// Rules are merged with is_user_css = 1 (higher than defaults).
+    /// Rules are registered as User origin (higher than defaults).
     pub fn load_user_stylesheet(&mut self, source: &str) -> Result<(), StyleError>;
 
     /// Load user stylesheet from file path (enables hot reload tracking).
     pub fn load_user_stylesheet_file(&mut self, path: impl AsRef<Path>) -> Result<(), StyleError>;
 }
 ```
+
+`load_user_stylesheet_file` should store a `ReloadableStylesheet` in `self.user`
+and call `rebuild_stylesheet()` to merge `defaults` + `user`.
 
 ### Style Computation
 
@@ -167,7 +188,7 @@ impl StyleManager {
 ```rust
 impl StyleManager {
     /// Tick the animator. Called each frame by the run loop.
-    pub fn tick(&mut self, dt: Duration);
+    pub fn tick(&mut self, now: Instant);
 
     /// Start an animation on a widget property.
     pub fn animate(
@@ -188,6 +209,10 @@ impl StyleManager {
 }
 ```
 
+`animate()` is numeric-only (f64) via the existing Animator. Non-numeric transitions
+use `ActiveTransition` overlays. `tick()` should also advance those overlays and
+purge completed ones.
+
 ### Hot Reload
 
 ```rust
@@ -201,8 +226,8 @@ impl StyleManager {
     /// Poll for file changes. Returns true if stylesheet was reloaded.
     ///
     /// If changes detected:
-    /// 1. Reloads stylesheet from file
-    /// 2. Re-merges with widget defaults
+    /// 1. Reloads user stylesheet from file
+    /// 2. Rebuilds effective stylesheet (defaults + user)
     /// 3. Increments theme_version
     /// 4. Invalidates all cached styles
     pub fn poll_hot_reload(&mut self) -> bool;
@@ -229,36 +254,55 @@ impl StyleManager {
 
 ### Stylesheet Merging
 
-Widget defaults and user CSS are merged into a single `StyleSheet`:
+Widget defaults and user CSS are combined into a single effective stylesheet,
+but rule origin must be preserved to set `Specificity.is_user_css` at match time.
+
+**Recommended approach (matches Python Textual behavior):**
+- Extend `StyleSheet` to store rule origin + source order:
 
 ```rust
-fn merge_stylesheets(defaults: &StyleSheet, user: &StyleSheet) -> StyleSheet {
-    let mut merged = StyleSheet::new();
-
-    // Add default rules with is_user_css = 0
-    for rule in defaults.rules() {
-        let mut rule = rule.clone();
-        rule.specificity.is_user_css = 0;
-        merged.add_rule(rule);
-    }
-
-    // Add user rules with is_user_css = 1
-    for rule in user.rules() {
-        let mut rule = rule.clone();
-        rule.specificity.is_user_css = 1;
-        merged.add_rule(rule);
-    }
-
-    merged
+pub enum RuleOrigin {
+    Default,
+    User,
 }
+
+pub struct RuleEntry {
+    pub rule: Rule,
+    pub origin: RuleOrigin,
+    pub source_order: u32,
+}
+```
+
+Then, when matching:
+1. Compute base specificity from selectors
+2. Inject `is_user_css` based on `origin`
+3. Use `source_order` as the final tie-breaker
+
+This avoids mutating `Rule` and keeps source ordering deterministic.
+
+```rust
+fn rebuild_stylesheet(&mut self) {
+    self.stylesheet = StyleSheet::merge_with_origins(&self.defaults, self.user.as_ref());
+}
+```
+
+### Matching Rules with Origin
+
+When gathering matching rules, inject origin into specificity:
+
+```rust
+let base = rule.specificity();
+let specificity = base.with_user_css(origin == RuleOrigin::User);
 ```
 
 ### Cache Key Computation
 
 The cache uses widget ID as primary key. Cache entries are validated against:
 
-1. **Ancestor Hash**: Computed from ancestor chain (types, ids, classes, pseudo-classes)
-2. **Theme Version**: Incremented on theme switch or hot reload
+1. **Widget Hash**: type_name + id + classes + pseudo-classes
+2. **Ancestor Hash**: Computed from ancestor chain (types, ids, classes, pseudo-classes)
+3. **Theme Version**: Incremented on theme switch or hot reload
+4. **Parent Background Hash**: Included when auto colors are present
 
 ```rust
 fn compute_ancestor_hash(ancestors: &[&WidgetMeta]) -> u64 {
@@ -300,18 +344,19 @@ fn apply_animated_values(
     widget_id: WidgetId,
     mut style: ComputedStyle,
 ) -> ComputedStyle {
-    // Check animator for active animations on this widget
-    for (key, value) in self.animator.current_values_for(widget_id) {
-        match key.property.as_str() {
-            "opacity" => style.opacity = Some(value),
-            "color" => {
-                // Animation value is a lerped color component
-                // (implementation depends on animation system)
-            }
-            // ... other animatable properties
-            _ => {}
-        }
+    // Animator uses object_id (u64) + property name.
+    // Requires `use slotmap::Key` for data()/as_ffi().
+    let object_id = widget_id.data().as_ffi();
+
+    // Numeric properties (Animator stores f64)
+    if let Some(opacity) = self.animator.get_value(&AnimationKey::new(object_id, "opacity")) {
+        style.opacity = Some(opacity);
     }
+
+    // Non-numeric properties (color, spacing, etc.) should use the
+    // TransitionController + ActiveTransition / interpolate_transition path.
+    // This is handled by a separate transition overlay map (see animated_values.md).
+
     style
 }
 ```
@@ -356,7 +401,7 @@ pub enum StyleError {
 
 ## Thread Safety
 
-`StyleManager` is **not** thread-safe by design. It should be owned by the main application struct and accessed through `&mut self` methods. This matches the single-threaded nature of the terminal UI event loop.
+`StyleManager` is **not** thread-safe by design. It should be owned by the main application struct and accessed on the main thread. Internally, the cache may use interior mutability so `get_style(&self)` can update cache stats without requiring a mutable borrow.
 
 If thread-safe access is needed in the future, wrap in `Arc<Mutex<StyleManager>>`.
 
@@ -370,8 +415,10 @@ mod tests {
         let mut sm = StyleManager::new();
         sm.register_widget_defaults::<Button>().unwrap();
 
+        let mut registry = WidgetRegistry::new();
         let meta = WidgetMeta::new("Button");
-        let style = sm.get_style(WidgetId(1), &meta, &[], &Color::default());
+        let widget_id = registry.add(Button::new("Test"));
+        let style = sm.get_style(widget_id, &meta, &[], &Color::default());
 
         // Verify default styles are applied
         assert!(style.background.is_some());
@@ -383,8 +430,10 @@ mod tests {
         sm.register_widget_defaults::<Button>().unwrap();
         sm.load_user_stylesheet("Button { background: red; }").unwrap();
 
+        let mut registry = WidgetRegistry::new();
         let meta = WidgetMeta::new("Button");
-        let style = sm.get_style(WidgetId(1), &meta, &[], &Color::default());
+        let widget_id = registry.add(Button::new("Test"));
+        let style = sm.get_style(widget_id, &meta, &[], &Color::default());
 
         // User CSS should win
         assert_eq!(style.background.unwrap().r, 255);
@@ -406,14 +455,16 @@ mod tests {
         let mut sm = StyleManager::new();
         sm.register_widget_defaults::<Button>().unwrap();
 
+        let mut registry = WidgetRegistry::new();
         let meta = WidgetMeta::new("Button");
         let ancestors: &[&WidgetMeta] = &[];
+        let widget_id = registry.add(Button::new("Test"));
 
         // First call computes
-        let _ = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+        let _ = sm.get_style(widget_id, &meta, ancestors, &Color::default());
 
         // Second call should hit cache (implementation detail, but verifiable via metrics)
-        let _ = sm.get_style(WidgetId(1), &meta, ancestors, &Color::default());
+        let _ = sm.get_style(widget_id, &meta, ancestors, &Color::default());
     }
 }
 ```

@@ -56,34 +56,34 @@ let context = RenderContext::new(style_manager);
 // context.ancestors = []
 
 // Screen renders
-fn render(&self, frame: &mut Frame, ctx: &RenderContext) {
-    let style = ctx.style_for(self.id, self);
+fn render_with_context(&self, id: WidgetId, frame: &mut Frame, ctx: &RenderContext) {
+    let style = ctx.style_for(id, self);
     // ctx.ancestors = [] when computing Screen's style
 
     let child_ctx = ctx.child_context(self, &style);
     // child_ctx.ancestors = [Screen]
 
-    for child in &self.children {
-        child.render(frame, &child_ctx);
+    for (child_id, child_area, child) in children_with_layout() {
+        child.render_with_context(child_id, child_area, frame, &child_ctx);
     }
 }
 
 // Container renders (child of Screen)
-fn render(&self, frame: &mut Frame, ctx: &RenderContext) {
-    let style = ctx.style_for(self.id, self);
+fn render_with_context(&self, id: WidgetId, frame: &mut Frame, ctx: &RenderContext) {
+    let style = ctx.style_for(id, self);
     // ctx.ancestors = [Screen] when computing Container's style
 
     let child_ctx = ctx.child_context(self, &style);
     // child_ctx.ancestors = [Screen, Container]
 
-    for child in &self.children {
-        child.render(frame, &child_ctx);
+    for (child_id, child_area, child) in children_with_layout() {
+        child.render_with_context(child_id, child_area, frame, &child_ctx);
     }
 }
 
 // Button renders (child of Container)
-fn render(&self, frame: &mut Frame, ctx: &RenderContext) {
-    let style = ctx.style_for(self.id, self);
+fn render_with_context(&self, id: WidgetId, frame: &mut Frame, ctx: &RenderContext) {
+    let style = ctx.style_for(id, self);
     // ctx.ancestors = [Screen, Container] when computing Button's style
     // CSS selector "Screen Container Button" can now match
 }
@@ -302,10 +302,12 @@ fn test_descendant_selector_matching() {
     let screen = WidgetMeta::new("Screen");
     let container = WidgetMeta::new("Container");
     let button = WidgetMeta::new("Button");
+    let mut registry = WidgetRegistry::new();
+    let widget_id = registry.add(Button::new("Test"));
 
     // Button with Container ancestor
     let ancestors: Vec<&WidgetMeta> = vec![&screen, &container];
-    let style = sm.get_style(WidgetId(1), &button, &ancestors, &Color::default());
+    let style = sm.get_style(widget_id, &button, &ancestors, &Color::default());
 
     assert_eq!(style.color.unwrap().r, 255);  // Red matched
 }
@@ -320,15 +322,18 @@ fn test_child_selector_matching() {
     let container = WidgetMeta::new("Container");
     let horizontal = WidgetMeta::new("Horizontal");
     let button = WidgetMeta::new("Button");
+    let mut registry = WidgetRegistry::new();
+    let widget_id1 = registry.add(Button::new("Test"));
+    let widget_id2 = registry.add(Button::new("Other"));
 
     // Button as direct child of Container
     let ancestors1: Vec<&WidgetMeta> = vec![&screen, &container];
-    let style1 = sm.get_style(WidgetId(1), &button, &ancestors1, &Color::default());
+    let style1 = sm.get_style(widget_id1, &button, &ancestors1, &Color::default());
     assert_eq!(style1.color.unwrap().b, 255);  // Blue matched
 
     // Button as grandchild of Container (through Horizontal)
     let ancestors2: Vec<&WidgetMeta> = vec![&screen, &container, &horizontal];
-    let style2 = sm.get_style(WidgetId(2), &button, &ancestors2, &Color::default());
+    let style2 = sm.get_style(widget_id2, &button, &ancestors2, &Color::default());
     assert!(style2.color.is_none());  // Selector didn't match
 }
 ```

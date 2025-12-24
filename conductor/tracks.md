@@ -54,5 +54,15 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [~] Track: TCSS Style Integration
+*Link: [./conductor/tracks/tcss_style_integration_20251223/](./conductor/tracks/tcss_style_integration_20251223/)*
+
+---
+
+## [ ] Track: Visual Parity - Rendering and Themes
+*Link: [./conductor/tracks/visual_parity_20251224/](./conductor/tracks/visual_parity_20251224/)*
+
+---
+
 ## [ ] Track: Advanced Widgets (Tier 4)
 *Link: [./conductor/tracks/advanced_widgets_20251221/](./conductor/tracks/advanced_widgets_20251221/)*
