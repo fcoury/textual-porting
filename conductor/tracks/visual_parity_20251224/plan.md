@@ -57,7 +57,7 @@
 - [x] Task: Port Python theme palettes and derived variable rules to Rust
 - [x] Task: Write tests for Digits glyph parity
 - [x] Task: Update Digits glyph patterns and rendering to match Python
-- [ ] Task: Conductor - User Manual Verification "Core Rendering Parity Complete" (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification "Core Rendering Parity Complete" (Protocol in workflow.md)
 
 **Completed in this session:**
 - Added `AlignHorizontal`, `AlignVertical` enums with `Left/Center/Right` and `Top/Middle/Bottom` values
@@ -205,12 +205,27 @@
   - Updated test to verify blue tint applied to contrast text
 
 ## Phase 4: Widget Parity Updates
-- [ ] Task: Write snapshot tests for Button default and variants (default/primary/warning)
-- [ ] Task: Update Button rendering to use new border/tint/align features
-- [ ] Task: Write snapshot tests for Label/Input/Digits using DEFAULT_CSS
+- [x] Task: Write snapshot tests for Button default and variants (default/primary/warning)
+- [x] Task: Update Button rendering to use new border/tint/align features
+- [x] Task: Write snapshot tests for Label/Input/Digits using DEFAULT_CSS
 - [ ] Task: Update Label/Input/Digits to use content-align, padding, text-opacity
-- [ ] Task: Update DEFAULT_CSS selectors to match Python (including pseudo-classes)
+- [x] Task: Update DEFAULT_CSS selectors to match Python (including pseudo-classes)
 - [ ] Task: Conductor - User Manual Verification "Widget Parity Complete" (Protocol in workflow.md)
+
+**Completed in Phase 4:**
+- Created `tests/widget_snapshots.rs` with 29 snapshot tests for Button, Label, Input, Digits
+- Tests cover: rendering, variants, pseudo-classes (:focus, :hover, :active, :disabled), custom CSS, borders
+- Updated Button DEFAULT_CSS to use pseudo-class selectors instead of class selectors (.-focused → :focus)
+- Button DEFAULT_CSS now matches Python Textual patterns:
+  - Base: `width: auto; min-width: 16; height: auto; line-pad: 1; text-align: center; content-align: center middle;`
+  - 3D style (.-style-default): tall top/bottom borders for depth effect
+  - Flat style (.-style-flat): block borders
+  - Pseudo-class rules for :focus, :hover, :active, :disabled
+  - Variant rules for -primary, -success, -warning, -error
+- Updated Button `render_button_with_style()` to apply CSS features:
+  - Uses `content_align_horizontal` for horizontal text alignment
+  - Uses `content_align_vertical` for vertical text positioning
+  - Uses `line_pad` for horizontal padding on label
 
 ## Phase 5: Example Parity
 - [ ] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
