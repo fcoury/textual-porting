@@ -258,6 +258,19 @@
   - Added `classes()` method to Widget trait implementation
   - Applies horizontal and vertical alignment to position content
 
+**Widget Rendering Fixes (Phase 4 continued):**
+- Input:
+  - Replaced `Block::default().borders(Borders::ALL)` with CSS border rendering pipeline
+  - Now uses `render_border()` + `inner_area()` like Button
+  - Vertical alignment applied (v_offset was computed but unused)
+  - Horizontal alignment applied via `Paragraph::alignment()`
+- Label:
+  - Fixed line-pad to apply per line, not per span (avoids duplicates with markup)
+  - Fixed vertical alignment for multiline content (uses actual line count)
+  - Properly splits spans on newlines and applies padding once per line
+- Digits:
+  - Added background fill for entire widget area when CSS specifies background
+
 ## Phase 5: Example Parity
 - [ ] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
 - [ ] Task: Add integration test that renders calculator to buffer and snapshots output
