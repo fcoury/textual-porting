@@ -64,5 +64,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [ ] Track: Python Examples Porting and Cleanup
+*Link: [./conductor/tracks/examples_porting_20251224/](./conductor/tracks/examples_porting_20251224/)*
+
+---
+
 ## [ ] Track: Advanced Widgets (Tier 4)
 *Link: [./conductor/tracks/advanced_widgets_20251221/](./conductor/tracks/advanced_widgets_20251221/)*
