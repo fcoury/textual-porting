@@ -19,6 +19,11 @@
 
 ## Phase 3: Implementation
 
+### 3.0 Review Fixes (Priority)
+- [x] Task: Enforce user CSS priority over DEFAULT_CSS (tests + implementation) [da9a122]
+- [ ] Task: Integrate theme variables + theme reparse on theme switch (tests + implementation)
+- [ ] Task: Hot reload paths + theme-aware reload (tests + implementation)
+
 ### 3.1 Core StyleManager
 - [x] Task: Write tests for StyleManager construction and basic API [63a3439]
 - [x] Task: Implement StyleManager struct with StyleSheet, ThemeRegistry, Animator, HotReloadManager [63a3439]
