@@ -47,13 +47,13 @@
 - [x] Task: Add widget_meta() method to Widget trait with default implementation [b96a59b]
 
 ### 3.3 ComputedStyle Adapter
-- [ ] Task: Write tests for ComputedStyle::to_ratatui_style() color conversion
-- [ ] Task: Implement color → fg/bg conversion in to_ratatui_style()
-- [ ] Task: Write tests for text_style → Modifier conversion
-- [ ] Task: Implement text_style (bold, italic, underline) → Modifier conversion
-- [ ] Task: Write tests for opacity handling (dim modifier)
-- [ ] Task: Implement opacity → dim modifier conversion
-- [ ] Task: Write comprehensive to_ratatui_style() integration tests
+- [x] Task: Write tests for ComputedStyle::to_ratatui_style() color conversion
+- [x] Task: Implement color → fg/bg conversion in to_ratatui_style()
+- [x] Task: Write tests for text_style → Modifier conversion
+- [x] Task: Implement text_style (bold, italic, underline) → Modifier conversion
+- [x] Task: Write tests for opacity handling (dim modifier)
+- [x] Task: Implement opacity → dim modifier conversion
+- [x] Task: Write comprehensive to_ratatui_style() integration tests
 
 ### 3.4 Style Computation Pipeline
 - [x] Task: Write tests for get_style() using compute_style_resolved()
@@ -95,20 +95,20 @@
 - [ ] Task: Wire invalidation to WidgetRefreshState.refresh_styles_required
 
 ### 3.8 Animator Integration
-- [ ] Task: Write tests for StyleManager::tick() advancing animations
-- [ ] Task: Implement tick() delegating to Animator
-- [ ] Task: Write tests for StyleManager::animate() starting animations
-- [ ] Task: Implement animate() API on StyleManager
-- [ ] Task: Write tests for animated values appearing in get_style() result
-- [ ] Task: Integrate Animator value lookup into get_style() pipeline
+- [x] Task: Write tests for StyleManager::tick() advancing animations [63a3439]
+- [x] Task: Implement tick() delegating to Animator [63a3439]
+- [x] Task: Write tests for StyleManager::animate() starting animations [63a3439]
+- [x] Task: Implement animate() API on StyleManager [63a3439]
+- [x] Task: Write tests for animated values appearing in get_style() result
+- [x] Task: Integrate Animator value lookup into get_style() pipeline
 
 ### 3.9 Hot Reload Integration
-- [ ] Task: Write tests for enable_hot_reload() configuration
-- [ ] Task: Implement enable_hot_reload() with path registration
-- [ ] Task: Write tests for poll_hot_reload() detecting changes
-- [ ] Task: Implement poll_hot_reload() with stylesheet reload
-- [ ] Task: Write tests for hot reload triggering invalidate_all()
-- [ ] Task: Wire poll_hot_reload() to invalidate_all() on changes
+- [x] Task: Write tests for enable_hot_reload() configuration [c2e548c]
+- [x] Task: Implement enable_hot_reload() with path registration [c2e548c]
+- [x] Task: Write tests for poll_hot_reload() detecting changes [c2e548c]
+- [x] Task: Implement poll_hot_reload() with stylesheet reload [c2e548c]
+- [x] Task: Write tests for hot reload triggering invalidate_all() [c2e548c]
+- [x] Task: Wire poll_hot_reload() to invalidate_all() on changes [c2e548c]
 
 ### 3.10 ManagedWidgetApp Integration
 - [ ] Task: Write tests for ManagedWidgetApp::style_manager() access
