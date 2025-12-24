@@ -264,12 +264,24 @@
   - Now uses `render_border()` + `inner_area()` like Button
   - Vertical alignment applied (v_offset was computed but unused)
   - Horizontal alignment applied via `Paragraph::alignment()`
+  - Border fallback changed from solid to none (fully CSS-driven)
+  - DEFAULT_CSS updated to match Python: tall border, padding: 0 2, :focus/:disabled rules
+  - Added .-invalid and .-textual-compact rules
 - Label:
   - Fixed line-pad to apply per line, not per span (avoids duplicates with markup)
   - Fixed vertical alignment for multiline content (uses actual line count)
   - Properly splits spans on newlines and applies padding once per line
+  - Changed height: 1 to height: auto; min-height: 1 for multi-line support
+  - Added background to variant styles ($success-muted, $error-muted, etc.)
+  - Fixed trailing newline handling (adds empty line when content ends with \n)
 - Digits:
   - Added background fill for entire widget area when CSS specifies background
+
+**Remaining Parity Gaps (tracked for future work):**
+- Input component class styles (.input--cursor, .input--placeholder, .input--selection)
+  require architectural changes to query StyleManager for component classes
+- Unicode cell width calculation (currently uses chars().count() instead of Rich metrics)
+- Input cursor/selection colors should follow theme variables
 
 ## Phase 5: Example Parity
 - [ ] Task: Convert Rust calculator example to widget tree + TCSS (reuse calculator.tcss)
