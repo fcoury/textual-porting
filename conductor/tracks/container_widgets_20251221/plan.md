@@ -138,14 +138,14 @@
 - [x] Task: Add DEFAULT_CSS (via layout hints - width: 1fr, height: auto)
 - [x] Task: Write tests for ContentSwitcher (15 tests)
 
-- [ ] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Implementation Complete' (Protocol in workflow.md) [aba3806]
 
 ## Phase 4: Testing & Verification
-- [ ] Task: Create integration tests with nested containers
-- [ ] Task: Create example app with tabs, collapsibles, scrolling
-- [ ] Task: Test keyboard navigation
-- [ ] Task: Test layout_recursive Display::None filtering (docked + content children, ContentSwitcher panes)
-- [ ] Task: Test grid_config() via Widget trait (ItemGrid custom config, existing Grid.grid_config())
-- [ ] Task: Test CloneableWidget + add_boxed() with downcasting/query paths and Auto sizing
-- [ ] Task: Run all tests and fix failures
+- [x] Task: Create integration tests with nested containers
+- [x] Task: Create example app with tabs, collapsibles, scrolling
+- [x] Task: Test keyboard navigation
+- [x] Task: Test layout_recursive Display::None filtering (docked + content children, ContentSwitcher panes)
+- [x] Task: Test grid_config() via Widget trait (ItemGrid custom config, existing Grid.grid_config())
+- [x] Task: Test CloneableWidget + add_boxed() with downcasting/query paths and Auto sizing (N/A - feature not implemented)
+- [x] Task: Run all tests and fix failures
 - [ ] Task: Conductor - User Manual Verification 'Track Complete' (Protocol in workflow.md)
