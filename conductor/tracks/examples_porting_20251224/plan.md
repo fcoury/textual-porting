@@ -3,7 +3,7 @@
 ## Phase 1: Inventory and Standards
 - [x] Task: Create `design/example_inventory.md` listing all Python examples (examples, demo, docs) and required assets (03e83b3)
 - [x] Task: Create `design/rust_examples_audit.md` to classify Rust examples as keep/replace/archive (1b06e30)
-- [ ] Task: Define porting template and conventions in `design/example_template.md` (StyleManager + TCSS + RenderContext)
+- [x] Task: Define porting template and conventions in `design/example_template.md` (StyleManager + TCSS + RenderContext) (c014a27)
 - [ ] Task: Define test harness conventions for example parity tests (snapshot + style assertions)
 - [ ] Task: Conductor - User Manual Verification 'Inventory Complete' (Protocol in workflow.md)
 
