@@ -9,7 +9,7 @@
 - [x] Task: Analyze TextArea syntax highlighting approach (60e689b)
 - [x] Task: Study _markdown.py rendering pipeline (ade2921)
 - [x] Task: Analyze _list_view.py virtualization strategy (9e62c2d)
-- [ ] Task: Study _log.py and _rich_log.py scrolling and formatting
+- [x] Task: Study _log.py and _rich_log.py scrolling and formatting (1718b8c)
 - [ ] Task: Research Rust syntax highlighting libraries (tree-sitter, syntect)
 - [ ] Task: Research Rust Markdown parsers (pulldown-cmark, comrak)
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
