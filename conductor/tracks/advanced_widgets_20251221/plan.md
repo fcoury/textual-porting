@@ -15,7 +15,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
 ## Phase 2: Design & Planning
-- [ ] Task: Design DataTable data model (Row, Column, Cell, Coordinate)
+- [x] Task: Design DataTable data model (Row, Column, Cell, Coordinate) (820d808)
 - [ ] Task: Design TreeNode<T> generic architecture
 - [ ] Task: Design TextArea document model (rope vs Vec<String>)
 - [ ] Task: Design syntax highlighting integration
