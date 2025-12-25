@@ -34,7 +34,7 @@
 - [x] Task: Write tests for data structures (01e239e)
 
 ### 3.2 DataTable Core
-- [ ] Task: Implement DataTable struct extending ScrollView
+- [x] Task: Implement DataTable struct extending ScrollView (7a7b4bb)
 - [ ] Task: Implement add_column() and add_columns()
 - [ ] Task: Implement add_row() and add_rows()
 - [ ] Task: Implement remove_row() and remove_column()
