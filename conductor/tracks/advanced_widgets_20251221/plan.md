@@ -35,7 +35,7 @@
 
 ### 3.2 DataTable Core
 - [x] Task: Implement DataTable struct extending ScrollView (7a7b4bb)
-- [ ] Task: Implement add_column() and add_columns()
+- [x] Task: Implement add_column() and add_columns() (fe27dc5)
 - [ ] Task: Implement add_row() and add_rows()
 - [ ] Task: Implement remove_row() and remove_column()
 - [ ] Task: Implement clear()
