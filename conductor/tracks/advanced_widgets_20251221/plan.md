@@ -27,7 +27,7 @@
 ## Phase 3: Implementation
 
 ### 3.1 DataTable Data Structures
-- [ ] Task: Implement RowKey and ColumnKey types
+- [x] Task: Implement RowKey and ColumnKey types (a6b4728)
 - [ ] Task: Implement Coordinate type
 - [ ] Task: Implement CellType trait/enum
 - [ ] Task: Implement Row and Column structs
