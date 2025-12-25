@@ -1,7 +1,7 @@
 # Plan: Advanced Widgets
 
 ## Phase 1: Analysis & Research
-- [ ] Task: Study Python Textual _data_table.py (108KB) in depth
+- [x] Task: Study Python Textual _data_table.py (108KB) in depth (162ec23)
 - [ ] Task: Document DataTable data structures and cursor system
 - [ ] Task: Study _tree.py (52KB) node management
 - [ ] Task: Analyze _directory_tree.py file system integration
