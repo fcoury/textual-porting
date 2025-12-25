@@ -19,7 +19,7 @@
 - [x] Task: Design TreeNode<T> generic architecture (553b892)
 - [x] Task: Design TextArea document model (rope vs Vec<String>) (881e526)
 - [x] Task: Design syntax highlighting integration (abfc3f5)
-- [ ] Task: Design Markdown AST to terminal rendering
+- [x] Task: Design Markdown AST to terminal rendering (c681c70)
 - [ ] Task: Design virtualization strategy for ListView
 - [ ] Task: Write technical design document
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
