@@ -7,7 +7,7 @@
 - [x] Task: Analyze _directory_tree.py file system integration (da38d24)
 - [x] Task: Study _text_area.py (100KB) document model (ceef420)
 - [x] Task: Analyze TextArea syntax highlighting approach (60e689b)
-- [ ] Task: Study _markdown.py rendering pipeline
+- [x] Task: Study _markdown.py rendering pipeline (ade2921)
 - [ ] Task: Analyze _list_view.py virtualization strategy
 - [ ] Task: Study _log.py and _rich_log.py scrolling and formatting
 - [ ] Task: Research Rust syntax highlighting libraries (tree-sitter, syntect)
