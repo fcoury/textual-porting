@@ -11,7 +11,7 @@
 - [x] Task: Analyze _list_view.py virtualization strategy (9e62c2d)
 - [x] Task: Study _log.py and _rich_log.py scrolling and formatting (1718b8c)
 - [x] Task: Research Rust syntax highlighting libraries (tree-sitter, syntect) (a603537)
-- [ ] Task: Research Rust Markdown parsers (pulldown-cmark, comrak)
+- [x] Task: Research Rust Markdown parsers (pulldown-cmark, comrak) (9eec4a6)
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
 ## Phase 2: Design & Planning
