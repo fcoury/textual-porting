@@ -18,7 +18,7 @@
 - [x] Task: Design DataTable data model (Row, Column, Cell, Coordinate) (820d808)
 - [x] Task: Design TreeNode<T> generic architecture (553b892)
 - [x] Task: Design TextArea document model (rope vs Vec<String>) (881e526)
-- [ ] Task: Design syntax highlighting integration
+- [x] Task: Design syntax highlighting integration (abfc3f5)
 - [ ] Task: Design Markdown AST to terminal rendering
 - [ ] Task: Design virtualization strategy for ListView
 - [ ] Task: Write technical design document
