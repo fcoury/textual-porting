@@ -14,7 +14,7 @@
 - [x] Task: Research Rust Markdown parsers (pulldown-cmark, comrak) (9eec4a6)
 - [ ] Task: Conductor - User Manual Verification 'Analysis Complete' (Protocol in workflow.md)
 
-## Phase 2: Design & Planning
+## Phase 2: Design & Planning [checkpoint: d0ef80b]
 - [x] Task: Design DataTable data model (Row, Column, Cell, Coordinate) (820d808)
 - [x] Task: Design TreeNode<T> generic architecture (553b892)
 - [x] Task: Design TextArea document model (rope vs Vec<String>) (881e526)
