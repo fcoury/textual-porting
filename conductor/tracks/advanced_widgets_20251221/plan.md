@@ -16,7 +16,7 @@
 
 ## Phase 2: Design & Planning
 - [x] Task: Design DataTable data model (Row, Column, Cell, Coordinate) (820d808)
-- [ ] Task: Design TreeNode<T> generic architecture
+- [x] Task: Design TreeNode<T> generic architecture (553b892)
 - [ ] Task: Design TextArea document model (rope vs Vec<String>)
 - [ ] Task: Design syntax highlighting integration
 - [ ] Task: Design Markdown AST to terminal rendering
