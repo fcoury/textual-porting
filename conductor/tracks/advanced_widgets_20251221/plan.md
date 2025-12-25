@@ -1,6 +1,6 @@
 # Plan: Advanced Widgets
 
-## Phase 1: Analysis & Research
+## Phase 1: Analysis & Research [checkpoint: b4b6ac5]
 - [x] Task: Study Python Textual _data_table.py (108KB) in depth (162ec23)
 - [x] Task: Document DataTable data structures and cursor system (a057e1e)
 - [x] Task: Study _tree.py (52KB) node management (c298918)
