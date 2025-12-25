@@ -29,7 +29,7 @@
 ### 3.1 DataTable Data Structures
 - [x] Task: Implement RowKey and ColumnKey types (a6b4728)
 - [x] Task: Implement Coordinate type (b4870f0)
-- [ ] Task: Implement CellType trait/enum
+- [x] Task: Implement CellType trait/enum (2ea4137)
 - [ ] Task: Implement Row and Column structs
 - [ ] Task: Write tests for data structures
 
