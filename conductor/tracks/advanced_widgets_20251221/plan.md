@@ -2,7 +2,7 @@
 
 ## Phase 1: Analysis & Research
 - [x] Task: Study Python Textual _data_table.py (108KB) in depth (162ec23)
-- [ ] Task: Document DataTable data structures and cursor system
+- [x] Task: Document DataTable data structures and cursor system (a057e1e)
 - [ ] Task: Study _tree.py (52KB) node management
 - [ ] Task: Analyze _directory_tree.py file system integration
 - [ ] Task: Study _text_area.py (100KB) document model
