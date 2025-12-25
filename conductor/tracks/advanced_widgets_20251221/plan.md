@@ -21,7 +21,7 @@
 - [x] Task: Design syntax highlighting integration (abfc3f5)
 - [x] Task: Design Markdown AST to terminal rendering (c681c70)
 - [x] Task: Design virtualization strategy for ListView (3824766)
-- [ ] Task: Write technical design document
+- [x] Task: Write technical design document (1d72e5e)
 - [ ] Task: Conductor - User Manual Verification 'Design Approved' (Protocol in workflow.md)
 
 ## Phase 3: Implementation
