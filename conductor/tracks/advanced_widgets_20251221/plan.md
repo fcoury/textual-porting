@@ -31,7 +31,7 @@
 - [x] Task: Implement Coordinate type (b4870f0)
 - [x] Task: Implement CellType trait/enum (2ea4137)
 - [x] Task: Implement Row and Column structs (a37c63b)
-- [ ] Task: Write tests for data structures
+- [x] Task: Write tests for data structures (01e239e)
 
 ### 3.2 DataTable Core
 - [ ] Task: Implement DataTable struct extending ScrollView
